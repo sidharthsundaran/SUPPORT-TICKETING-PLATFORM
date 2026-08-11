@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { projectService, ProjectService } from "../services/project.service.js";
+import { UnauthorizedError } from "../utils/app-error.js";
 
 export class ProjectController {
   constructor(private readonly service: ProjectService = projectService) {}
@@ -11,11 +12,11 @@ export class ProjectController {
   ): Promise<void> => {
     try {
       const { name, description } = req.body;
-      const ownerId = req.user?._id.toString()
+      const ownerId = req.user?._id?.toString();
 
       if (!ownerId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
-        return; 
+        next(new UnauthorizedError("Authentication required"));
+        return;
       }
 
       const project = await this.service.createProject({
@@ -54,9 +55,9 @@ export class ProjectController {
     next: NextFunction
   ): Promise<void> => {
     try {
-      const userId = req.user?._id.toString();
+      const userId = req.user?._id?.toString();
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        next(new UnauthorizedError("Authentication required"));
         return;
       }
 

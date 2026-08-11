@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { authService, AuthService } from "../services/auth.service.js";
+import { UnauthorizedError } from "../utils/app-error.js";
 
 export class AuthController {
   constructor(private readonly service: AuthService = authService) {}
@@ -45,10 +46,7 @@ export class AuthController {
   ): Promise<void> => {
     try {
       if (!req.user) {
-        res.status(401).json({
-          success: false,
-          message: "Authentication required",
-        });
+        next(new UnauthorizedError("Authentication required"));
         return;
       }
 

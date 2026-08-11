@@ -6,7 +6,6 @@ import {
 import {
   projectMembershipRepository,
   ProjectMembershipRepository,
-  CreateMembershipData,
 } from "../repositories/project-membership.repository.js";
 import {
   projectMembershipService,
@@ -78,4 +77,3 @@ export class ProjectService {
 }
 
 export const projectService = new ProjectService();
-

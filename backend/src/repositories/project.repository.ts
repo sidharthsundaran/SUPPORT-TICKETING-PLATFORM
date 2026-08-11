@@ -1,5 +1,4 @@
 import Project , {IProject} from "../models/Project";
-import { projectService } from "../services/project.service";
 
 export interface CreateProjectData {
   name: string;

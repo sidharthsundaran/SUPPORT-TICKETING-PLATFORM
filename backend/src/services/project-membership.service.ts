@@ -3,18 +3,22 @@ import {
   ConflictError,
   NotFoundError,
 } from "../utils/app-error.js";
+
 import {
   projectMembershipRepository,
   ProjectMembershipRepository,
 } from "../repositories/project-membership.repository.js";
+
 import {
   projectRepository,
   ProjectRepository,
 } from "../repositories/project.repository.js";
+
 import {
   userRepository,
   UserRepository,
 } from "../repositories/user.repository.js";
+
 import {
   ProjectRole,
   IProjectMembership,
@@ -35,8 +39,8 @@ const CLIENT_ROLES: ProjectRole[] = [
 ];
 
 export interface AddMemberDTO {
-  userId?: string;
-  role?: ProjectRole;
+  userId: string;
+  role: ProjectRole;
   clientOrganisation?: string;
   receivesNewTicketAlerts?: boolean;
 }
@@ -49,114 +53,75 @@ export interface UpdateMemberDTO {
 
 export class ProjectMembershipService {
   constructor(
-    private readonly membershipRepo: ProjectMembershipRepository = projectMembershipRepository,
-    private readonly projectRepo: ProjectRepository = projectRepository,
-    private readonly userRepo: UserRepository = userRepository
+    private readonly membershipRepo: ProjectMembershipRepository =
+      projectMembershipRepository,
+
+    private readonly projectRepo: ProjectRepository =
+      projectRepository,
+
+    private readonly userRepo: UserRepository =
+      userRepository
   ) {}
 
-  async addMember(projectId: string, dto: AddMemberDTO): Promise<IProjectMembership> {
-    const { userId, role, clientOrganisation, receivesNewTicketAlerts } = dto;
+  async addMember(
+    projectId: string,
+    dto: AddMemberDTO
+  ): Promise<IProjectMembership> {
+    const { userId, role } = dto;
 
-    if (!userId || !role) {
-      throw new BadRequestError("userId and role are required");
-    }
+    this.validateRole(role);
 
-    if (!VALID_ROLES.includes(role)) {
-      throw new BadRequestError("Invalid project role");
-    }
+    await this.validateProject(projectId);
 
-    const project = await this.projectRepo.findById(projectId);
+    const user = await this.validateUser(userId);
 
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
+    await this.validateUserRole(user.userType, role);
 
-    if (!project.isActive) {
-      throw new BadRequestError("Cannot add members to an inactive project");
-    }
-
-    const user = await this.userRepo.findById(userId);
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
-    if (!user.isActive) {
-      throw new BadRequestError("Cannot add an inactive user");
-    }
-
-    const existingMembership = await this.membershipRepo.findByUserAndProject(
+    await this.validateNotAlreadyMember(
       userId,
       projectId
     );
 
-    if (existingMembership) {
-      throw new ConflictError("User is already a member of this project");
-    }
-
-    if (CLIENT_ROLES.includes(role) && !clientOrganisation?.trim()) {
-      throw new BadRequestError(
-        "clientOrganisation is required for client roles"
-      );
-    }
-
-    if (!CLIENT_ROLES.includes(role) && clientOrganisation) {
-      throw new BadRequestError(
-        "clientOrganisation is only allowed for client roles"
-      );
-    }
-
-    if (CLIENT_ROLES.includes(role) && user.userType !== "client") {
-      throw new BadRequestError(
-        "Client roles can only be assigned to client users"
-      );
-    }
-
-    if (!CLIENT_ROLES.includes(role) && user.userType !== "internal") {
-      throw new BadRequestError(
-        "Internal project roles can only be assigned to internal users"
-      );
-    }
+    this.validateOrganisation(role, dto.clientOrganisation);
 
     return this.membershipRepo.create({
       userId,
       projectId,
       role,
-      clientOrganisation: clientOrganisation?.trim(),
-      receivesNewTicketAlerts: receivesNewTicketAlerts ?? false,
+      clientOrganisation:
+        dto.clientOrganisation?.trim(),
+      receivesNewTicketAlerts:
+        dto.receivesNewTicketAlerts ?? false,
     });
   }
 
-  async getProjectMembers(projectId: string): Promise<IProjectMembership[]> {
-    const project = await this.projectRepo.findById(projectId);
+  async getProjectMembers(
+    projectId: string
+  ): Promise<IProjectMembership[]> {
+    await this.validateProject(projectId);
 
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
-
-    return this.membershipRepo.findByProject(projectId);
+    return this.membershipRepo.findByProject(
+      projectId
+    );
   }
 
-  async getMembersByRole(projectId: string, role: ProjectRole): Promise<IProjectMembership[]> {
-    const project = await this.projectRepo.findById(projectId);
+  async getMembersByRole(
+    projectId: string,
+    role: ProjectRole
+  ): Promise<IProjectMembership[]> {
+    await this.validateProject(projectId);
+    this.validateRole(role);
 
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (!VALID_ROLES.includes(role)) {
-      throw new BadRequestError("Invalid project role");
-    }
-
-    return this.membershipRepo.findByProjectAndRole(projectId, role);
+    return this.membershipRepo.findByProjectAndRole(
+      projectId,
+      role
+    );
   }
 
-  async getUserMemberships(userId: string): Promise<IProjectMembership[]> {
-    const user = await this.userRepo.findById(userId);
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+  async getUserMemberships(
+    userId: string
+  ): Promise<IProjectMembership[]> {
+    await this.validateUser(userId);
 
     return this.membershipRepo.findByUser(userId);
   }
@@ -165,73 +130,71 @@ export class ProjectMembershipService {
     projectId: string,
     userId: string,
     dto: UpdateMemberDTO
-  ): Promise<IProjectMembership | null> {
-    const membership = await this.membershipRepo.findByUserAndProject(
-      userId,
-      projectId
-    );
+  ): Promise<IProjectMembership> {
+    const membership =
+      await this.membershipRepo.findByUserAndProject(
+        userId,
+        projectId
+      );
 
     if (!membership) {
-      throw new NotFoundError("Project membership not found");
+      throw new NotFoundError(
+        "Project membership not found"
+      );
     }
 
     if (dto.role) {
-      if (!VALID_ROLES.includes(dto.role)) {
-        throw new BadRequestError("Invalid project role");
-      }
+      this.validateRole(dto.role);
 
-      const user = await this.userRepo.findById(userId);
+      const user =
+        await this.validateUser(userId);
 
-      if (!user) {
-        throw new NotFoundError("User not found");
-      }
+      await this.validateUserRole(
+        user.userType,
+        dto.role
+      );
 
-      if (CLIENT_ROLES.includes(dto.role) && user.userType !== "client") {
-        throw new BadRequestError(
-          "Client roles can only be assigned to client users"
-        );
-      }
-
-      if (!CLIENT_ROLES.includes(dto.role) && user.userType !== "internal") {
-        throw new BadRequestError(
-          "Internal project roles can only be assigned to internal users"
-        );
-      }
-
-      if (
-        CLIENT_ROLES.includes(dto.role) &&
-        !(dto.clientOrganisation?.trim() || membership.clientOrganisation)
-      ) {
-        throw new BadRequestError(
-          "clientOrganisation is required for client roles"
-        );
-      }
-
-      if (!CLIENT_ROLES.includes(dto.role) && dto.clientOrganisation) {
-        throw new BadRequestError(
-          "clientOrganisation is only allowed for client roles"
-        );
-      }
+      this.validateOrganisation(
+        dto.role,
+        dto.clientOrganisation ??
+          membership.clientOrganisation
+      );
     }
 
-    const updateData: Partial<IProjectMembership> = {};
+    const updateData: Partial<IProjectMembership> =
+      {};
 
     if (dto.role !== undefined) {
       updateData.role = dto.role;
     }
 
-    if (dto.receivesNewTicketAlerts !== undefined) {
-      updateData.receivesNewTicketAlerts = dto.receivesNewTicketAlerts;
+    if (
+      dto.clientOrganisation !== undefined
+    ) {
+      updateData.clientOrganisation =
+        dto.clientOrganisation.trim();
     }
 
-    if (dto.clientOrganisation !== undefined) {
-      updateData.clientOrganisation = dto.clientOrganisation.trim();
+    if (
+      dto.receivesNewTicketAlerts !== undefined
+    ) {
+      updateData.receivesNewTicketAlerts =
+        dto.receivesNewTicketAlerts;
     }
 
-    return this.membershipRepo.updateById(
-      membership._id.toString(),
-      updateData
-    );
+    const updated =
+      await this.membershipRepo.updateById(
+        membership._id.toString(),
+        updateData
+      );
+
+    if (!updated) {
+      throw new NotFoundError(
+        "Project membership not found"
+      );
+    }
+
+    return updated;
   }
 
   async updateMemberById(
@@ -239,9 +202,7 @@ export class ProjectMembershipService {
     role: ProjectRole,
     clientOrganisation?: string
   ): Promise<IProjectMembership> {
-    if (!VALID_ROLES.includes(role)) {
-      throw new BadRequestError("Invalid project role");
-    }
+    this.validateRole(role);
 
     const updated = await this.membershipRepo.updateRole(
       membershipId,
@@ -256,14 +217,20 @@ export class ProjectMembershipService {
     return updated;
   }
 
-  async removeMember(projectId: string, userId: string): Promise<IProjectMembership | null> {
-    const membership = await this.membershipRepo.findByUserAndProject(
-      userId,
-      projectId
-    );
+  async removeMember(
+    projectId: string,
+    userId: string
+  ): Promise<void> {
+    const membership =
+      await this.membershipRepo.findByUserAndProject(
+        userId,
+        projectId
+      );
 
     if (!membership) {
-      throw new NotFoundError("Project membership not found");
+      throw new NotFoundError(
+        "Project membership not found"
+      );
     }
 
     if (membership.role === "project_admin") {
@@ -272,7 +239,9 @@ export class ProjectMembershipService {
       );
     }
 
-    return this.membershipRepo.deleteById(membership._id.toString());
+    await this.membershipRepo.deleteById(
+      membership._id.toString()
+    );
   }
 
   async removeMemberById(membershipId: string): Promise<void> {
@@ -282,6 +251,128 @@ export class ProjectMembershipService {
       throw new NotFoundError("Project membership not found");
     }
   }
+
+  private validateRole(
+    role: ProjectRole
+  ): void {
+    if (!VALID_ROLES.includes(role)) {
+      throw new BadRequestError(
+        "Invalid project role"
+      );
+    }
+  }
+
+  private async validateProject(
+    projectId: string
+  ) {
+    const project =
+      await this.projectRepo.findById(projectId);
+
+    if (!project) {
+      throw new NotFoundError(
+        "Project not found"
+      );
+    }
+
+    if (!project.isActive) {
+      throw new BadRequestError(
+        "Project is inactive"
+      );
+    }
+
+    return project;
+  }
+
+  private async validateUser(
+    userId: string
+  ) {
+    const user =
+      await this.userRepo.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError(
+        "User not found"
+      );
+    }
+
+    if (!user.isActive) {
+      throw new BadRequestError(
+        "User account is inactive"
+      );
+    }
+
+    return user;
+  }
+
+  private async validateNotAlreadyMember(
+    userId: string,
+    projectId: string
+  ): Promise<void> {
+    const existing =
+      await this.membershipRepo.findByUserAndProject(
+        userId,
+        projectId
+      );
+
+    if (existing) {
+      throw new ConflictError(
+        "User is already a member of this project"
+      );
+    }
+  }
+
+  private async validateUserRole(
+    userType: "internal" | "client",
+    role: ProjectRole
+  ): Promise<void> {
+    const isClientRole =
+      CLIENT_ROLES.includes(role);
+
+    if (
+      isClientRole &&
+      userType !== "client"
+    ) {
+      throw new BadRequestError(
+        "Client roles can only be assigned to client users"
+      );
+    }
+
+    if (
+      !isClientRole &&
+      userType !== "internal"
+    ) {
+      throw new BadRequestError(
+        "Internal roles can only be assigned to internal users"
+      );
+    }
+  }
+
+  private validateOrganisation(
+    role: ProjectRole,
+    organisation?: string
+  ): void {
+    const isClientRole =
+      CLIENT_ROLES.includes(role);
+
+    if (
+      isClientRole &&
+      !organisation?.trim()
+    ) {
+      throw new BadRequestError(
+        "clientOrganisation is required for client roles"
+      );
+    }
+
+    if (
+      !isClientRole &&
+      organisation
+    ) {
+      throw new BadRequestError(
+        "clientOrganisation is only allowed for client roles"
+      );
+    }
+  }
 }
 
-export const projectMembershipService = new ProjectMembershipService();
+export const projectMembershipService =
+  new ProjectMembershipService();

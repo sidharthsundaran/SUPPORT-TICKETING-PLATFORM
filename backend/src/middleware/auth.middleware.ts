@@ -1,30 +1,25 @@
 import { Request, Response, NextFunction } from "express";
 import { userRepository } from "../repositories/user.repository.js";
 import { verifyAccessToken } from "../utils/jwt.js";
+import { UnauthorizedError, ForbiddenError } from "../utils/app-error.js";
 
 const authMiddleware = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      next(new UnauthorizedError("Authentication required"));
       return;
     }
 
     const [scheme, token] = authHeader.split(" ");
 
     if (scheme !== "Bearer" || !token) {
-      res.status(401).json({
-        success: false,
-        message: "Invalid authorization header",
-      });
+      next(new UnauthorizedError("Invalid authorization header"));
       return;
     }
 
@@ -33,29 +28,19 @@ const authMiddleware = async (
     const user = await userRepository.findById(payload.userId);
 
     if (!user) {
-      res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
+      next(new UnauthorizedError("User not found"));
       return;
     }
 
     if (!user.isActive) {
-      res.status(403).json({
-        success: false,
-        message: "Account is inactive",
-      });
+      next(new ForbiddenError("Account is inactive"));
       return;
     }
 
     req.user = user;
-
     next();
-  } catch {
-    res.status(401).json({
-      success: false,
-      message: "Invalid or expired access token",
-    });
+  } catch  {
+    next(new UnauthorizedError("Invalid or expired access token"));
   }
 };
 
