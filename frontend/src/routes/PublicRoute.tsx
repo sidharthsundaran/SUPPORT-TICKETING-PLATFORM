@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 interface PublicRouteProps {
@@ -10,24 +11,19 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
   children,
   restrictedForAuth = false,
 }) => {
-  const { isAuthenticated, isInitialized } = useAuth();
+  const { isAuthenticated, isInitialized, user } = useAuth();
 
   if (!isInitialized) {
     return null;
   }
 
-  if (isAuthenticated && restrictedForAuth) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white p-4">
-        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full">
-          <h2 className="text-xl font-bold text-indigo-400 mb-2">Already Authenticated</h2>
-          <p className="text-slate-400 text-sm mb-4">You are already signed in.</p>
-        </div>
-      </div>
-    );
+  if (isAuthenticated && user && restrictedForAuth) {
+    const redirectPath = user.userType === 'internal' ? '/internal/dashboard' : '/dashboard';
+    return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;
 };
 
 export default PublicRoute;
+

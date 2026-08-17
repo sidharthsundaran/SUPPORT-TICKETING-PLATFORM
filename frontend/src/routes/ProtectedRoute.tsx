@@ -1,16 +1,19 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredUserType?: 'internal' | 'client';
   requireAdmin?: boolean;
+  loginPath?: string;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredUserType,
   requireAdmin = false,
+  loginPath,
 }) => {
   const { isAuthenticated, isInitialized, user } = useAuth();
 
@@ -19,39 +22,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white p-4">
-        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full">
-          <h2 className="text-xl font-bold text-red-400 mb-2">Access Denied</h2>
-          <p className="text-slate-400 text-sm mb-4">You must be logged in to view this page.</p>
-        </div>
-      </div>
-    );
+    return <Navigate to={loginPath ?? '/login'} replace />;
   }
 
   if (requiredUserType && user.userType !== requiredUserType) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white p-4">
-        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full">
-          <h2 className="text-xl font-bold text-amber-400 mb-2">Unauthorized</h2>
-          <p className="text-slate-400 text-sm mb-4">You do not have permission to access this resource.</p>
-        </div>
-      </div>
-    );
+    return <Navigate to="/unauthorized" replace />;
   }
 
   if (requireAdmin && !user.isPlatformAdmin) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white p-4">
-        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full">
-          <h2 className="text-xl font-bold text-amber-400 mb-2">Admin Access Required</h2>
-          <p className="text-slate-400 text-sm mb-4">Platform Administrator permissions are required.</p>
-        </div>
-      </div>
-    );
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <>{children}</>;
 };
 
 export default ProtectedRoute;
+

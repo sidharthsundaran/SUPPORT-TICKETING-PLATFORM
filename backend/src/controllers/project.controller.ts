@@ -49,6 +49,25 @@ export class ProjectController {
     }
   };
 
+  updateProject = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { name, description, isActive } = req.body;
+      const project = await this.service.updateProject(id, { name, description, isActive });
+      res.status(200).json({
+        success: true,
+        message: "Project updated successfully",
+        data: { project },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getMyProjects = async (
     req: Request,
     res: Response,

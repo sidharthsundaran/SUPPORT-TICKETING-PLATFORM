@@ -14,18 +14,19 @@ router.use(authMiddleware);
 router.post("/", platformAdminMiddleware, projectController.createProject);
 router.get("/me", projectController.getMyProjects);
 router.get("/:id", requireProjectMember, projectController.getProject);
+router.patch("/:id", requireProjectAdmin, projectController.updateProject);
 
 // Membership routes
 router.get("/:id/members", requireProjectMember, projectController.getMembers);
 router.post("/:id/members", requireProjectAdmin, projectController.addMember);
 router.patch(
   "/members/:membershipId",
-  platformAdminMiddleware,
+  requireProjectAdmin,
   projectController.updateMemberRole
 );
 router.delete(
   "/members/:membershipId",
-  platformAdminMiddleware,
+  requireProjectAdmin,
   projectController.removeMember
 );
 

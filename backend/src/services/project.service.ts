@@ -47,6 +47,29 @@ export class ProjectService {
     return project;
   }
 
+  async updateProject(
+    projectId: string,
+    updateData: { name?: string; description?: string; isActive?: boolean }
+  ): Promise<IProject> {
+    const existing = await this.getProjectById(projectId);
+
+    if (updateData.name !== undefined && updateData.name.trim().length < 2) {
+      throw new BadRequestError("Project name must be at least 2 characters long");
+    }
+
+    const updated = await this.projectRepo.updateById(projectId, {
+      ...(updateData.name !== undefined && { name: updateData.name.trim() }),
+      ...(updateData.description !== undefined && { description: updateData.description.trim() }),
+      ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+    });
+
+    if (!updated) {
+      throw new NotFoundError("Project not found");
+    }
+
+    return updated;
+  }
+
   async getProjectsForUser(userId: string): Promise<IProjectMembership[]> {
     return this.membershipRepo.findByUser(userId);
   }

@@ -36,6 +36,10 @@ export class UserRepository {
   async updateById(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
     return User.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
   }
+
+  async findAll(): Promise<IUser[]> {
+    return User.find({ isActive: true }, "_id name email userType isPlatformAdmin").sort({ name: 1 });
+  }
 }
 
 export const userRepository = new UserRepository();
