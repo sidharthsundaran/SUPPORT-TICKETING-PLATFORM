@@ -4,9 +4,7 @@ import User from "../models/user.js";
 import Ticket, { ITicket } from "../models/Ticket.js";
 
 export class NotificationService {
-  /**
-   * Helper to resolve team recipients for a project who have receivesNewTicketAlerts: true
-   */
+
   async getTeamRecipientsForProject(projectId: string): Promise<string[]> {
     const memberships = await ProjectMembership.find({
       projectId,
@@ -17,9 +15,7 @@ export class NotificationService {
     return userIds;
   }
 
-  /**
-   * Enqueue New Ticket Notification Job (BR-NTF-001, BR-NTF-002, BR-NTF-003)
-   */
+
   async dispatchNewTicketNotifications(ticket: ITicket): Promise<void> {
     const projectIdStr =
       typeof ticket.projectId === "object" && (ticket.projectId as any)._id
@@ -31,10 +27,8 @@ export class NotificationService {
         ? (ticket.requesterId as any)._id.toString()
         : ticket.requesterId.toString();
 
-    // Resolve team members with receivesNewTicketAlerts = true
     const teamUserIds = await this.getTeamRecipientsForProject(projectIdStr);
-    
-    // Filter out requester if requester is on the team
+
     const teamRecipientIds = teamUserIds.filter((id) => id !== requesterIdStr);
 
     if (notificationQueue) {
@@ -58,9 +52,7 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Enqueue Status Change Notification Job (BR-NTF-004, BR-NTF-009)
-   */
+
   async dispatchStatusChangeNotification(
     ticket: ITicket,
     oldStatus: string,
@@ -92,9 +84,7 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Enqueue Assignment Notification Job (BR-NTF-005)
-   */
+
   async dispatchAssignmentNotification(
     ticket: ITicket,
     newAssigneeId: string,
@@ -118,9 +108,7 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Enqueue Reply Notification Job (BR-NTF-006, BR-NTF-007)
-   */
+
   async dispatchReplyNotification(
     ticket: ITicket,
     authorId: string,

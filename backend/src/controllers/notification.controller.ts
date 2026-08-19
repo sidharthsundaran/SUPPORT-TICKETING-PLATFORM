@@ -3,7 +3,6 @@ import { notificationRepository } from "../repositories/notification.repository.
 import { BadRequestError, NotFoundError } from "../utils/app-error.js";
 
 export class NotificationController {
-  // GET /api/notifications/my
   getMyNotifications = async (
     req: Request,
     res: Response,

@@ -1,9 +1,11 @@
 import { TicketSeverity } from "../models/Ticket.js";
 
 export interface ISlaTarget {
-  firstResponseHours: number;
+  firstResponseHours?: number;
+  firstResponseBusinessDays?: number;
   resolutionHours?: number;
   resolutionBusinessDays?: number;
+  qualitativeTarget?: string;
 }
 
 export const DEFAULT_SLA_MATRIX: Record<TicketSeverity, ISlaTarget> = {
@@ -12,19 +14,21 @@ export const DEFAULT_SLA_MATRIX: Record<TicketSeverity, ISlaTarget> = {
     resolutionHours: 8,
   },
   high: {
-    firstResponseHours: 2,
-    resolutionHours: 24,
+    firstResponseHours: 4,
+    resolutionBusinessDays: 2,
   },
   medium: {
-    firstResponseHours: 4,
-    resolutionBusinessDays: 3,
-  },
-  low: {
     firstResponseHours: 8,
     resolutionBusinessDays: 5,
   },
-  enhancement: {
-    firstResponseHours: 24,
+  low: {
+    firstResponseBusinessDays: 1,
     resolutionBusinessDays: 10,
+    qualitativeTarget: "Next scheduled release",
+  },
+  enhancement: {
+    firstResponseBusinessDays: 2,
+    resolutionBusinessDays: 15,
+    qualitativeTarget: "Per backlog grooming",
   },
 };

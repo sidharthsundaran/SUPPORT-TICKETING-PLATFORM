@@ -85,7 +85,7 @@ export class TicketService {
     private readonly userRepo: UserRepository = userRepository,
     private readonly activityRepo: TicketActivityRepository = ticketActivityRepository,
     private readonly s3Svc: S3Service = s3Service
-  ) {}
+  ) { }
 
   async createTicket(dto: CreateTicketDTO): Promise<ITicket> {
     this.validateCreateTicket(dto);
@@ -179,7 +179,6 @@ export class TicketService {
       newValue: createdTicket.title,
     });
 
-    // Dispatch Notifications (BR-NTF-001, BR-NTF-002, BR-NTF-003)
     await notificationService.dispatchNewTicketNotifications(createdTicket);
 
     return createdTicket;
@@ -291,7 +290,6 @@ export class TicketService {
       });
     }
 
-    // Dispatch Assignment Notification (BR-NTF-005)
     await notificationService.dispatchAssignmentNotification(updated, assigneeId, actorId);
 
     return updated;

@@ -24,7 +24,7 @@ export const Sidebar: React.FC = () => {
   const getNavItems = (): NavItem[] => {
     if (isPlatformAdmin) {
       return [
-        { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Users', href: '/admin/users', icon: Users },
         { name: 'Tickets', href: '/tickets', icon: Ticket },
@@ -34,7 +34,7 @@ export const Sidebar: React.FC = () => {
 
     if (isInternal) {
       return [
-        { name: 'Dashboard', href: '/internal/dashboard', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Tickets', href: '/tickets', icon: Ticket },
         { name: 'Profile', href: '/profile', icon: User },

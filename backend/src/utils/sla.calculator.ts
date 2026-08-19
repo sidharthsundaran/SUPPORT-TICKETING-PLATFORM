@@ -32,8 +32,10 @@ export function getSlaTarget(
 
   return {
     firstResponseHours: custom?.firstResponseHours ?? defaultTarget.firstResponseHours,
+    firstResponseBusinessDays: custom?.firstResponseBusinessDays ?? defaultTarget.firstResponseBusinessDays,
     resolutionHours: custom?.resolutionHours ?? defaultTarget.resolutionHours,
     resolutionBusinessDays: custom?.resolutionBusinessDays ?? defaultTarget.resolutionBusinessDays,
+    qualitativeTarget: custom?.qualitativeTarget ?? defaultTarget.qualitativeTarget,
   };
 }
 
@@ -46,8 +48,14 @@ export function calculateFirstResponseDueAt(
   projectMatrix?: Partial<Record<TicketSeverity, ISlaTarget>>
 ): Date {
   const target = getSlaTarget(severity, projectMatrix);
+
+  if (target.firstResponseBusinessDays) {
+    return addBusinessDays(startDate, target.firstResponseBusinessDays);
+  }
+
+  const hours = target.firstResponseHours || 8;
   const due = new Date(startDate.getTime());
-  due.setHours(due.getHours() + target.firstResponseHours);
+  due.setHours(due.getHours() + hours);
   return due;
 }
 
@@ -65,7 +73,7 @@ export function calculateResolutionDueAt(
     return addBusinessDays(startDate, target.resolutionBusinessDays);
   }
 
-  const hours = target.resolutionHours || 48; // fallback
+  const hours = target.resolutionHours || 48;
   const due = new Date(startDate.getTime());
   due.setHours(due.getHours() + hours);
   return due;

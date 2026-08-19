@@ -9,6 +9,8 @@ import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import reportingRoutes from "./routes/reporting.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/reports", reportingRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

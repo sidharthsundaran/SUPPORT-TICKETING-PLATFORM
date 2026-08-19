@@ -9,6 +9,7 @@ export interface IUser extends Document {
   userType: UserType;
   isPlatformAdmin: boolean;
   isActive: boolean;
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +48,10 @@ const userSchema = new Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
     },
   },
   {

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FolderKanban,
   AlertCircle,
+  Download,
 } from "lucide-react";
 
 import { useSearchTicketsQuery } from "../../features/tickets/ticketApi";
@@ -26,7 +27,7 @@ import { useNavigate } from "react-router-dom";
 
 export const TicketsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isClient } = useAuth();
+  const { isClient, token } = useAuth();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -103,6 +104,33 @@ export const TicketsPage: React.FC = () => {
   const totalPages = pagination?.totalPages ?? 1;
   const isInitialLoading = isLoading && tickets.length === 0;
 
+  const handleExportCsv = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+      const params = new URLSearchParams();
+      if (selectedProjectId) params.append("projectId", selectedProjectId);
+
+      const res = await fetch(`${baseUrl}/reports/export?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to export CSV");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tickets_export_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[CSV Export Error]:", err);
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans">
       {/* Page Header */}
@@ -125,14 +153,25 @@ export const TicketsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/tickets/new")}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm active:scale-[0.98] transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Create Ticket
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs active:scale-[0.98] transition cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-indigo-600" />
+            Export CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/tickets/new")}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm active:scale-[0.98] transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Create Ticket
+          </button>
+        </div>
       </div>
 
       {/* Project Selector Bar */}

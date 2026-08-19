@@ -15,6 +15,8 @@ import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { useAuth } from '../hooks/useAuth';
 
+import UsersPage from '../pages/admin/UsersPage';
+
 const RootRedirect: React.FC = () => {
   const { user } = useAuth();
   if (user?.isPlatformAdmin) return <Navigate to="/admin/dashboard" replace />;
@@ -58,7 +60,7 @@ export const AppRoutes: React.FC = () => {
           path="/dashboard"
           element={
             <ProtectedRoute requiredUserType="client">
-              <DashboardPage portalTitle="Client Support Portal" />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
@@ -68,7 +70,7 @@ export const AppRoutes: React.FC = () => {
           path="/internal/dashboard"
           element={
             <ProtectedRoute requiredUserType="internal">
-              <DashboardPage portalTitle="Internal Staff Desk" />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
@@ -78,7 +80,7 @@ export const AppRoutes: React.FC = () => {
           path="/admin/dashboard"
           element={
             <ProtectedRoute requireAdmin loginPath="/login">
-              <DashboardPage portalTitle="Platform Admin Console" />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
@@ -94,7 +96,7 @@ export const AppRoutes: React.FC = () => {
           path="/admin/users"
           element={
             <ProtectedRoute requireAdmin>
-              <PlaceholderPage title="User Management" description="Manage platform user accounts and permissions." />
+              <UsersPage />
             </ProtectedRoute>
           }
         />

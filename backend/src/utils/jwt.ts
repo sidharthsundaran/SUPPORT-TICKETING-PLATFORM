@@ -3,10 +3,12 @@ import { authConfig } from "../config/auth.js";
 
 export interface AccessTokenPayload {
   userId: string;
+  tokenVersion?: number;
 }
 
 export interface RefreshTokenPayload {
   userId: string;
+  tokenVersion?: number;
 }
 
 export const generateAccessToken = (

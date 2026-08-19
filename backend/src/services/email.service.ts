@@ -19,7 +19,6 @@ export class EmailService {
 
     if (user && pass) {
       this.defaultSender = user;
-      // If EMAIL_SERVICE is explicitly set or no host provided, use Nodemailer's built-in "gmail" service
       if (process.env.EMAIL_SERVICE === "gmail" || !host) {
         this.transporter = nodemailer.createTransport({
           service: "gmail",
@@ -68,7 +67,7 @@ export class EmailService {
 
   renderHtmlTemplate(title: string, contentHtml: string, actionUrl?: string, actionText?: string): string {
     const brandName = process.env.PLATFORM_NAME || "Support Ticketing Platform";
-    
+
     return `
       <!DOCTYPE html>
       <html>

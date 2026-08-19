@@ -78,8 +78,14 @@ export class AuthService {
       userType,
     });
 
-    const accessToken = generateAccessToken({ userId: user._id.toString() });
-    const refreshToken = generateRefreshToken({ userId: user._id.toString() });
+    const accessToken = generateAccessToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
+    const refreshToken = generateRefreshToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
 
     return {
       user: {
@@ -115,8 +121,14 @@ export class AuthService {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const accessToken = generateAccessToken({ userId: user._id.toString() });
-    const refreshToken = generateRefreshToken({ userId: user._id.toString() });
+    const accessToken = generateAccessToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
+    const refreshToken = generateRefreshToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
 
     return {
       user: {
@@ -143,6 +155,7 @@ export class AuthService {
       },
     };
   }
+
   async refreshAccessToken(refreshToken: string): Promise<AuthResult> {
     if (!refreshToken) {
       throw new UnauthorizedError("Refresh token required");
@@ -165,8 +178,21 @@ export class AuthService {
       throw new ForbiddenError("Account is inactive");
     }
 
-    const newAccessToken = generateAccessToken({ userId: user._id.toString() });
-    const newRefreshToken = generateRefreshToken({ userId: user._id.toString() });
+    if (
+      payload.tokenVersion !== undefined &&
+      payload.tokenVersion !== (user.tokenVersion || 0)
+    ) {
+      throw new UnauthorizedError("Session invalidated. Please log in again.");
+    }
+
+    const newAccessToken = generateAccessToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
+    const newRefreshToken = generateRefreshToken({
+      userId: user._id.toString(),
+      tokenVersion: user.tokenVersion || 0,
+    });
 
     return {
       user: {

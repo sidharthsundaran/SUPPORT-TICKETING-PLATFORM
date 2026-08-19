@@ -36,7 +36,6 @@ const errorMiddleware = (
   }
 
   if (isObject(error)) {
-    // Handle Mongoose CastError (e.g. invalid ObjectId)
     if (error.name === "CastError") {
       const castErr = error as unknown as CastError;
       res.status(400).json({
@@ -46,7 +45,6 @@ const errorMiddleware = (
       return;
     }
 
-    // Handle Mongoose ValidationError
     if (error.name === "ValidationError" && isObject(error.errors)) {
       const validationErr = error as unknown as ValidationError;
       const messages = Object.values(validationErr.errors).map(
@@ -59,7 +57,6 @@ const errorMiddleware = (
       return;
     }
 
-    // Handle MongoDB Duplicate Key Error (Code 11000)
     if (error.code === 11000) {
       const dupErr = error as unknown as MongoDuplicateKeyError;
       const field = Object.keys(dupErr.keyValue || {})[0] || "field";
