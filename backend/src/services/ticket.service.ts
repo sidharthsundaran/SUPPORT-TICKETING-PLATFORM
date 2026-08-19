@@ -25,15 +25,25 @@ import {
 } from "../repositories/project-membership.repository.js";
 
 import {
-  categoryRepository,
-  CategoryRepository,
-} from "../repositories/category.repository.js";
+  userRepository,
+  UserRepository,
+} from "../repositories/user.repository.js";
 
-import { ITicket, TicketSeverity, TicketStatus } from "../models/Ticket.js";
+import {
+  ticketActivityRepository,
+  TicketActivityRepository,
+} from "../repositories/ticket-activity.repository.js";
+
+import { ITicket, TicketStatus, TicketSeverity, ITicketEvidenceFile } from "../models/Ticket.js";
+import { s3Service, S3Service } from "./s3.service.js";
+import {
+  calculateFirstResponseDueAt,
+  calculateResolutionDueAt,
+} from "../utils/sla.calculator.js";
+import { notificationService, NotificationService } from "./notification.service.js";
 
 export interface CreateTicketDTO {
   projectId: string;
-  categoryId: string;
   requesterId: string;
   title: string;
   description: string;
@@ -44,6 +54,7 @@ export interface CreateTicketDTO {
   applicationUrl?: string;
   pageUrl?: string;
   clientOrganisation?: string;
+  evidenceFiles?: ITicketEvidenceFile[];
   sessionContext?: {
     browser?: string;
     os?: string;
@@ -53,7 +64,6 @@ export interface CreateTicketDTO {
 }
 
 export interface UpdateTicketDTO {
-  categoryId?: string;
   title?: string;
   description?: string;
   issueType?: string;
@@ -62,6 +72,8 @@ export interface UpdateTicketDTO {
   environment?: string;
   applicationUrl?: string;
   pageUrl?: string;
+  retainedEvidenceKeys?: string[];
+  newEvidenceFiles?: ITicketEvidenceFile[];
 }
 
 export class TicketService {
@@ -70,66 +82,107 @@ export class TicketService {
     private readonly projectRepo: ProjectRepository = projectRepository,
     private readonly membershipRepo: ProjectMembershipRepository =
       projectMembershipRepository,
-    private readonly categoryRepo: CategoryRepository = categoryRepository
+    private readonly userRepo: UserRepository = userRepository,
+    private readonly activityRepo: TicketActivityRepository = ticketActivityRepository,
+    private readonly s3Svc: S3Service = s3Service
   ) {}
 
   async createTicket(dto: CreateTicketDTO): Promise<ITicket> {
     this.validateCreateTicket(dto);
 
-    // Perform validation queries and ticket number generation concurrently
-    const [project, membership, category, ticketNumber] = await Promise.all([
+    // 1. Fetch Project, Membership, and Requester concurrently
+    const [project, membership, requesterUser] = await Promise.all([
       this.projectRepo.findById(dto.projectId),
       this.membershipRepo.findByUserAndProject(dto.requesterId, dto.projectId),
-      this.categoryRepo.findById(dto.categoryId),
-      this.generateTicketNumber(),
+      this.userRepo.findById(dto.requesterId),
     ]);
 
-    // 1. Validate project existence and active status
     if (!project) {
       throw new NotFoundError("Project not found");
     }
 
-    if (!project.isActive) {
+    if (project.status === "inactive" || project.isActive === false) {
       throw new BadRequestError("Cannot create ticket in an inactive project");
     }
 
-    // 2. Validate requester membership
-    if (!membership) {
+    // 2. Validate requester membership or platform admin status
+    if (!membership && !requesterUser?.isPlatformAdmin) {
       throw new BadRequestError("Requester is not a member of this project");
     }
 
-    // 3. Validate category existence, project association, and active status
-    if (!category) {
-      throw new NotFoundError("Category not found");
+    // 3. Validate Issue Type against Project's configured list
+    if (project.issueTypes && project.issueTypes.length > 0) {
+      const validIssueType = project.issueTypes.some(
+        (it) => it.name.toLowerCase() === dto.issueType.trim().toLowerCase() && it.isActive
+      );
+      if (!validIssueType) {
+        throw new BadRequestError("Invalid or inactive Issue Type for this project");
+      }
     }
 
-    if (category.projectId.toString() !== dto.projectId) {
-      throw new BadRequestError("Category does not belong to this project");
+    // 4. Validate Module against Project's configured list
+    if (project.modules && project.modules.length > 0) {
+      const validModule = project.modules.some(
+        (m) => m.name.toLowerCase() === dto.module.trim().toLowerCase() && m.isActive
+      );
+      if (!validModule) {
+        throw new BadRequestError("Invalid or inactive Product Module for this project");
+      }
     }
 
-    if (!category.isActive) {
-      throw new BadRequestError("Category is inactive");
-    }
+    // 5. Generate BR-TKT-005 Ticket Reference: <PROJECTCODE>-<YYYYMM>-<SEQ>
+    const ticketNumber = await this.generateTicketNumber(project.code || "TKT");
 
-    // 4. Build sanitized data payload
+    // 6. Compute SLA Due Dates based on project matrix or defaults
+    const now = new Date();
+    const severity = dto.severity ?? "medium";
+    const slaFirstResponseDueAt = calculateFirstResponseDueAt(
+      now,
+      severity,
+      (project as any).slaMatrix
+    );
+    const slaResolutionDueAt = calculateResolutionDueAt(
+      now,
+      severity,
+      (project as any).slaMatrix
+    );
+
+    // 7. Build sanitized data payload
     const ticketData: CreateTicketData = {
       ticketNumber,
       projectId: dto.projectId,
-      categoryId: dto.categoryId,
       requesterId: dto.requesterId,
       clientOrganisation: dto.clientOrganisation?.trim(),
       title: dto.title.trim(),
       description: dto.description.trim(),
       issueType: dto.issueType.trim(),
       module: dto.module.trim(),
-      severity: dto.severity ?? "medium",
+      severity,
       environment: dto.environment.trim(),
       applicationUrl: dto.applicationUrl?.trim(),
       pageUrl: dto.pageUrl?.trim(),
+      evidenceFiles: dto.evidenceFiles || [],
       sessionContext: dto.sessionContext,
+      slaFirstResponseDueAt,
+      slaResolutionDueAt,
+      slaFirstResponseStatus: "pending",
+      slaResolutionStatus: "within_sla",
     };
 
-    return this.ticketRepo.create(ticketData);
+    const createdTicket = await this.ticketRepo.create(ticketData);
+
+    // Log Activity
+    await this.activityRepo.create({
+      ticketId: createdTicket._id.toString(),
+      actorId: dto.requesterId,
+      action: "created",
+      newValue: createdTicket.title,
+    });
+
+    // Dispatch Notifications (BR-NTF-001, BR-NTF-002, BR-NTF-003)
+    await notificationService.dispatchNewTicketNotifications(createdTicket);
+
+    return createdTicket;
   }
 
   async getTicketById(ticketId: string): Promise<ITicket> {
@@ -189,7 +242,8 @@ export class TicketService {
 
   async assignTicket(
     ticketId: string,
-    assigneeId: string
+    assigneeId: string,
+    actorId?: string
   ): Promise<ITicket> {
     const ticket = await this.getRawTicketById(ticketId);
 
@@ -227,31 +281,78 @@ export class TicketService {
       throw new NotFoundError("Ticket not found");
     }
 
+    if (actorId) {
+      await this.activityRepo.create({
+        ticketId,
+        actorId,
+        action: "assignee_changed",
+        oldValue: ticket.assigneeId?.toString() || "Unassigned",
+        newValue: assigneeId,
+      });
+    }
+
+    // Dispatch Assignment Notification (BR-NTF-005)
+    await notificationService.dispatchAssignmentNotification(updated, assigneeId, actorId);
+
     return updated;
   }
 
   async updateStatus(
     ticketId: string,
-    status: TicketStatus
+    status: TicketStatus,
+    actorId?: string
   ): Promise<ITicket> {
     const ticket = await this.getRawTicketById(ticketId);
 
     const updateData: Partial<ITicket> = { status };
 
+    const now = new Date();
+
+    // 1. First Response Stop
     if (
-      !ticket.firstResponseAt &&
-      ["in_progress", "awaiting_client_response", "resolved"].includes(status)
+      (!ticket.firstResponseAt || ticket.slaFirstResponseStatus === "pending") &&
+      ["triaged", "in_progress", "awaiting_client_response", "resolved"].includes(status)
     ) {
-      updateData.firstResponseAt = new Date();
+      updateData.firstResponseAt = now;
+      const dueAt = ticket.slaFirstResponseDueAt ? new Date(ticket.slaFirstResponseDueAt) : null;
+      updateData.slaFirstResponseStatus = dueAt && now <= dueAt ? "met" : "breached";
     }
 
+    // 2. BR-WFL-003: SLA Pause on awaiting_client_response
+    if (status === "awaiting_client_response") {
+      updateData.slaClock = {
+        pausedAt: now,
+        totalPausedMs: ticket.slaClock?.totalPausedMs || 0,
+      };
+    } else if (ticket.status === "awaiting_client_response" && ticket.slaClock?.pausedAt) {
+      const pauseDuration = now.getTime() - new Date(ticket.slaClock.pausedAt).getTime();
+      const newTotalPausedMs = (ticket.slaClock.totalPausedMs || 0) + pauseDuration;
+
+      updateData.slaClock = {
+        pausedAt: undefined,
+        totalPausedMs: newTotalPausedMs,
+      };
+
+      if (ticket.slaResolutionDueAt) {
+        updateData.slaResolutionDueAt = new Date(
+          new Date(ticket.slaResolutionDueAt).getTime() + pauseDuration
+        );
+      }
+    }
+
+    // 3. Resolution Stop
     if (status === "resolved") {
-      updateData.resolvedAt = new Date();
+      updateData.resolvedAt = now;
+      const dueAt = updateData.slaResolutionDueAt || (ticket.slaResolutionDueAt ? new Date(ticket.slaResolutionDueAt) : null);
+      updateData.slaResolutionStatus = dueAt && now <= dueAt ? "within_sla" : "breached";
     } else if (status === "closed") {
-      updateData.closedAt = new Date();
+      updateData.closedAt = now;
     } else if (status === "reopened") {
       updateData.resolvedAt = undefined;
       updateData.closedAt = undefined;
+      if (ticket.slaResolutionDueAt && now > new Date(ticket.slaResolutionDueAt)) {
+        updateData.slaResolutionStatus = "breached";
+      }
     }
 
     const updated = await this.ticketRepo.updateById(
@@ -263,37 +364,34 @@ export class TicketService {
       throw new NotFoundError("Ticket not found");
     }
 
+    if (actorId && ticket.status !== status) {
+      await this.activityRepo.create({
+        ticketId,
+        actorId,
+        action: "status_changed",
+        oldValue: ticket.status,
+        newValue: status,
+      });
+
+      // Dispatch Status Change Notification (BR-NTF-004, BR-NTF-009)
+      await notificationService.dispatchStatusChangeNotification(
+        updated,
+        ticket.status,
+        status,
+        actorId
+      );
+    }
+
     return updated;
   }
 
   async updateTicket(
     ticketId: string,
-    dto: UpdateTicketDTO
+    dto: UpdateTicketDTO,
+    actorId?: string
   ): Promise<ITicket> {
-    const [ticket, category] = await Promise.all([
-      this.getRawTicketById(ticketId),
-      dto.categoryId
-        ? this.categoryRepo.findById(dto.categoryId)
-        : Promise.resolve(null),
-    ]);
-
+    const ticket = await this.getRawTicketById(ticketId);
     const updateData: Partial<ITicket> = {};
-
-    if (dto.categoryId) {
-      if (!category) {
-        throw new NotFoundError("Category not found");
-      }
-
-      if (category.projectId.toString() !== ticket.projectId.toString()) {
-        throw new BadRequestError("Category does not belong to this project");
-      }
-
-      if (!category.isActive) {
-        throw new BadRequestError("Category is inactive");
-      }
-
-      updateData.categoryId = category._id;
-    }
 
     if (dto.title !== undefined) {
       const title = dto.title.trim();
@@ -337,6 +435,40 @@ export class TicketService {
       updateData.pageUrl = dto.pageUrl.trim();
     }
 
+    if (dto.retainedEvidenceKeys !== undefined || dto.newEvidenceFiles !== undefined) {
+      const currentEvidence = ticket.evidenceFiles || [];
+      const retainedKeys = dto.retainedEvidenceKeys || currentEvidence.map((f) => f.key);
+
+      const removedFiles = currentEvidence.filter((f) => !retainedKeys.includes(f.key));
+      const keptFiles = currentEvidence.filter((f) => retainedKeys.includes(f.key));
+      const newFiles = dto.newEvidenceFiles || [];
+
+      for (const removed of removedFiles) {
+        await this.s3Svc.deleteFileFromS3(removed.key);
+        if (actorId) {
+          await this.activityRepo.create({
+            ticketId,
+            actorId,
+            action: "evidence_removed",
+            newValue: removed.originalName,
+          });
+        }
+      }
+
+      if (newFiles.length > 0 && actorId) {
+        for (const nf of newFiles) {
+          await this.activityRepo.create({
+            ticketId,
+            actorId,
+            action: "evidence_added",
+            newValue: nf.originalName,
+          });
+        }
+      }
+
+      updateData.evidenceFiles = [...keptFiles, ...newFiles];
+    }
+
     if (Object.keys(updateData).length === 0) {
       return ticket;
     }
@@ -348,6 +480,25 @@ export class TicketService {
 
     if (!updated) {
       throw new NotFoundError("Ticket not found");
+    }
+
+    if (actorId) {
+      if (dto.severity && dto.severity !== ticket.severity) {
+        await this.activityRepo.create({
+          ticketId,
+          actorId,
+          action: "severity_changed",
+          oldValue: ticket.severity,
+          newValue: dto.severity,
+        });
+      }
+
+      await this.activityRepo.create({
+        ticketId,
+        actorId,
+        action: "details_updated",
+        metadata: updateData,
+      });
     }
 
     return updated;
@@ -382,7 +533,7 @@ export class TicketService {
       throw new NotFoundError("Project not found");
     }
 
-    if (!project.isActive) {
+    if (project.status === "inactive" || project.isActive === false) {
       throw new BadRequestError("Project is inactive");
     }
 
@@ -392,10 +543,6 @@ export class TicketService {
   private validateCreateTicket(dto: CreateTicketDTO): void {
     if (!dto.projectId) {
       throw new BadRequestError("projectId is required");
-    }
-
-    if (!dto.categoryId) {
-      throw new BadRequestError("categoryId is required");
     }
 
     if (!dto.requesterId) {
@@ -426,27 +573,25 @@ export class TicketService {
     }
   }
 
-  private async generateTicketNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const key = `ticket:seq:${year}`;
+  // BR-TKT-005: Format <PROJECTCODE>-<YYYYMM>-<SEQ> (e.g. RB-202608-0042)
+  private async generateTicketNumber(projectCode: string): Promise<string> {
+    const now = new Date();
+    const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const code = projectCode.toUpperCase().trim();
+    const key = `ticket:seq:${code}:${yyyymm}`;
 
     try {
-      const exists = await redisConnection.exists(key);
-      if (!exists) {
-        const count = await this.ticketRepo.countByYear(year);
-        await redisConnection.setnx(key, count);
-      }
-
       const seq = await redisConnection.incr(key);
-      const sequence = String(seq).padStart(6, "0");
-
-      return `TKT-${year}-${sequence}`;
+      if (seq === 1) {
+        await redisConnection.expire(key, 60 * 60 * 24 * 40);
+      }
+      const sequence = String(seq).padStart(4, "0");
+      return `${code}-${yyyymm}-${sequence}`;
     } catch (error) {
       console.error("Redis sequence generator error, falling back to DB count:", error);
-      const count = await this.ticketRepo.countByYear(year);
-      const sequence = String(count + 1).padStart(6, "0");
-
-      return `TKT-${year}-${sequence}`;
+      const count = await this.ticketRepo.countByYear(now.getFullYear());
+      const sequence = String(count + 1).padStart(4, "0");
+      return `${code}-${yyyymm}-${sequence}`;
     }
   }
 }

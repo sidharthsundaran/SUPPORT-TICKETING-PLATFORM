@@ -12,9 +12,36 @@ import {
   ProjectMembershipService,
   AddMemberDTO,
 } from "./project-membership.service.js";
-import { IProject } from "../models/Project.js";
+import { IProject, ProjectConfigItem } from "../models/Project.js";
 import { IProjectMembership, ProjectRole } from "../models/ProjectMembership.js";
-import { BadRequestError, NotFoundError } from "../utils/app-error.js";
+import { BadRequestError, NotFoundError, ConflictError } from "../utils/app-error.js";
+
+export const BRD_DEFAULT_ISSUE_TYPES: ProjectConfigItem[] = [
+  { name: "Bug / Defect", isActive: true },
+  { name: "How-to Question", isActive: true },
+  { name: "Data Issue", isActive: true },
+  { name: "Access and Permissions", isActive: true },
+  { name: "Performance", isActive: true },
+  { name: "Enhancement Request", isActive: true },
+  { name: "Integration Issue", isActive: true },
+  { name: "Other", isActive: true },
+];
+
+export const BRD_DEFAULT_MODULES: ProjectConfigItem[] = [
+  { name: "Job Requisition", isActive: true },
+  { name: "Candidate Pipeline", isActive: true },
+  { name: "Resume-JD Matching", isActive: true },
+  { name: "Voice Bot / Screening", isActive: true },
+  { name: "Mailbox", isActive: true },
+  { name: "Career Page", isActive: true },
+  { name: "Offer Letter", isActive: true },
+  { name: "Trivia", isActive: true },
+  { name: "Analytics Dashboard", isActive: true },
+  { name: "WhatsApp / Teams Integration", isActive: true },
+  { name: "User and Role Management", isActive: true },
+  { name: "Login and Authentication", isActive: true },
+  { name: "Other", isActive: true },
+];
 
 export class ProjectService {
   constructor(
@@ -28,7 +55,21 @@ export class ProjectService {
       throw new BadRequestError("Project name must be at least 2 characters long");
     }
 
-    const project = await this.projectRepo.create(data);
+    let code = (data.code || this.generateProjectCode(data.name)).toUpperCase();
+
+    const existingCode = await this.projectRepo.findByCode(code);
+    if (existingCode) {
+      code = `${code}${Math.floor(10 + Math.random() * 90)}`;
+    }
+
+    const projectData: CreateProjectData = {
+      ...data,
+      code,
+      issueTypes: data.issueTypes?.length ? data.issueTypes : BRD_DEFAULT_ISSUE_TYPES,
+      modules: data.modules?.length ? data.modules : BRD_DEFAULT_MODULES,
+    };
+
+    const project = await this.projectRepo.create(projectData);
 
     await this.membershipRepo.create({
       userId: data.ownerId,
@@ -49,7 +90,7 @@ export class ProjectService {
 
   async updateProject(
     projectId: string,
-    updateData: { name?: string; description?: string; isActive?: boolean }
+    updateData: Partial<IProject>
   ): Promise<IProject> {
     const existing = await this.getProjectById(projectId);
 
@@ -57,11 +98,7 @@ export class ProjectService {
       throw new BadRequestError("Project name must be at least 2 characters long");
     }
 
-    const updated = await this.projectRepo.updateById(projectId, {
-      ...(updateData.name !== undefined && { name: updateData.name.trim() }),
-      ...(updateData.description !== undefined && { description: updateData.description.trim() }),
-      ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
-    });
+    const updated = await this.projectRepo.updateById(projectId, updateData);
 
     if (!updated) {
       throw new NotFoundError("Project not found");
@@ -96,6 +133,14 @@ export class ProjectService {
 
   async removeMember(membershipId: string): Promise<void> {
     await this.membershipService.removeMemberById(membershipId);
+  }
+
+  private generateProjectCode(name: string): string {
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return name.slice(0, 3).toUpperCase();
   }
 }
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useLoginMutation } from '../authApi';
 import { loginSchema } from '../schemas/auth.schema';
@@ -13,6 +14,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onSwitchToRegister,
   onSuccess,
 }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -39,9 +41,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     }
 
     try {
-      await login(parseResult.data).unwrap();
+      const result = await login(parseResult.data).unwrap();
       if (onSuccess) {
         onSuccess();
+      } else if (result?.data?.user) {
+        const u = result.data.user;
+        if (u.isPlatformAdmin) {
+          navigate('/admin/dashboard');
+        } else if (u.userType === 'internal') {
+          navigate('/internal/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       const errorPayload = err as ApiError;

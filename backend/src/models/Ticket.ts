@@ -18,11 +18,18 @@ export type TicketSeverity =
   | "low"
   | "enhancement";
 
+export interface ITicketEvidenceFile {
+  key: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+}
+
 export interface ITicket extends Document {
   ticketNumber: string;
 
   projectId: Types.ObjectId;
-  categoryId: Types.ObjectId;
 
   requesterId: Types.ObjectId;
   clientOrganisation?: string;
@@ -32,11 +39,13 @@ export interface ITicket extends Document {
 
   issueType: string;
   module: string;
+  tags?: string[];
   severity: TicketSeverity;
   environment: string;
 
   applicationUrl?: string;
   pageUrl?: string;
+  evidenceFiles?: ITicketEvidenceFile[];
 
   status: TicketStatus;
 
@@ -55,6 +64,12 @@ export interface ITicket extends Document {
 
   slaFirstResponseDueAt?: Date;
   slaResolutionDueAt?: Date;
+  slaFirstResponseStatus?: "pending" | "met" | "breached";
+  slaResolutionStatus?: "within_sla" | "approaching_breach" | "breached";
+  slaClock?: {
+    pausedAt?: Date;
+    totalPausedMs?: number;
+  };
 
   isArchived: boolean;
   deletedAt?: Date;
@@ -76,12 +91,6 @@ const ticketSchema = new Schema<ITicket>(
     projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
-      required: true,
-    },
-
-    categoryId: {
-      type: Schema.Types.ObjectId,
-      ref: "Category",
       required: true,
       index: true,
     },
@@ -117,13 +126,17 @@ const ticketSchema = new Schema<ITicket>(
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
 
     module: {
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
+
+    tags: [{ type: String, trim: true }],
 
     severity: {
       type: String,
@@ -154,6 +167,16 @@ const ticketSchema = new Schema<ITicket>(
       type: String,
       trim: true,
     },
+
+    evidenceFiles: [
+      {
+        key: { type: String, required: true },
+        originalName: { type: String, required: true },
+        mimeType: { type: String, required: true },
+        size: { type: Number, required: true },
+        url: { type: String, required: true },
+      },
+    ],
 
     status: {
       type: String,
@@ -195,6 +218,24 @@ const ticketSchema = new Schema<ITicket>(
     slaFirstResponseDueAt: Date,
 
     slaResolutionDueAt: Date,
+
+    slaFirstResponseStatus: {
+      type: String,
+      enum: ["pending", "met", "breached"],
+      default: "pending",
+    },
+
+    slaResolutionStatus: {
+      type: String,
+      enum: ["within_sla", "approaching_breach", "breached"],
+      default: "within_sla",
+      index: true,
+    },
+
+    slaClock: {
+      pausedAt: Date,
+      totalPausedMs: { type: Number, default: 0 },
+    },
 
     isArchived: {
       type: Boolean,

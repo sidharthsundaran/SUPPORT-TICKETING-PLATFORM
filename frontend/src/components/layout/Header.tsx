@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu, LogOut, Ticket, ShieldCheck, UserCheck, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useLogoutMutation } from '../../features/auth/authApi';
+import NotificationBell from '../../features/notifications/components/NotificationBell';
 
 interface HeaderProps {
   onOpenMobileMenu: () => void;
@@ -64,8 +65,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu }) => {
         </div>
       </div>
 
-      {/* Right: User Avatar / Badge / Sign Out */}
+      {/* Right: User Avatar / Badge / Notifications / Sign Out */}
       <div className="flex items-center gap-3 sm:gap-4">
+        <NotificationBell />
+
         {getRoleBadge()}
 
         {user && (

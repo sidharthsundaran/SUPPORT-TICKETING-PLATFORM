@@ -10,11 +10,87 @@ import {
   PaginationOptions,
 } from "../repositories/ticket.repository.js";
 import { TicketStatus } from "../models/Ticket.js";
+import { ticketActivityRepository } from "../repositories/ticket-activity.repository.js";
+import { projectMembershipRepository } from "../repositories/project-membership.repository.js";
+import { s3Service } from "../services/s3.service.js";
 
 export class TicketController {
   constructor(
     private readonly service: TicketService = ticketService
   ) {}
+
+  // POST /api/tickets/upload-url
+  getPresignedUploadUrl = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { fileName, fileType, fileSize } = req.body;
+      const result = await s3Service.generatePresignedUploadUrl(
+        fileName,
+        fileType,
+        Number(fileSize)
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // GET /api/tickets/evidence-url?key=...
+  getEvidenceViewUrl = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const key = req.query.key as string;
+      if (!key) {
+        res.status(400).json({ success: false, message: "S3 object key is required" });
+        return;
+      }
+
+      const url = await s3Service.generatePresignedGetUrl(key);
+      res.status(200).json({
+        success: true,
+        data: { url },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // GET /api/tickets/evidence-file?key=...
+  streamEvidenceFile = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const key = req.query.key as string;
+      if (!key) {
+        res.status(400).json({ success: false, message: "S3 object key is required" });
+        return;
+      }
+
+      const { stream, contentType, contentLength } = await s3Service.getFileStream(key);
+
+      res.setHeader("Content-Type", contentType);
+      if (contentLength) {
+        res.setHeader("Content-Length", contentLength);
+      }
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
+      (stream as any).pipe(res);
+    } catch (error) {
+      next(error);
+    }
+  };
 
   // POST /api/tickets
   createTicket = async (
@@ -194,13 +270,14 @@ export class TicketController {
         projectId: this.getStringQuery(req.query.projectId),
         requesterId: this.getStringQuery(req.query.requesterId),
         assigneeId: this.getStringQuery(req.query.assigneeId),
-        categoryId: this.getStringQuery(req.query.categoryId),
         status: this.getStringQuery(
           req.query.status
         ) as TicketStatus | undefined,
         severity: this.getStringQuery(req.query.severity) as
           | TicketFilters["severity"]
           | undefined,
+        issueType: this.getStringQuery(req.query.issueType),
+        module: this.getStringQuery(req.query.module),
         clientOrganisation: this.getStringQuery(
           req.query.clientOrganisation
         ),
@@ -212,6 +289,32 @@ export class TicketController {
       };
 
       const options = this.getPaginationOptions(req);
+
+      // Scoping logic: client users must only see tickets from projects they belong to
+      const user = req.user;
+      if (user && !user.isPlatformAdmin) {
+        const memberships = await projectMembershipRepository.findByUser(user._id.toString());
+        const userProjectIds = memberships.map((m) =>
+          typeof m.projectId === "object" && (m.projectId as any)._id
+            ? (m.projectId as any)._id.toString()
+            : m.projectId.toString()
+        );
+
+        if (user.userType === "client") {
+          if (filters.projectId) {
+            if (!userProjectIds.includes(filters.projectId)) {
+              res.status(200).json({
+                success: true,
+                data: [],
+                pagination: { total: 0, page: 1, limit: options.limit || 20, totalPages: 0 },
+              });
+              return;
+            }
+          } else {
+            filters.projectIds = userProjectIds;
+          }
+        }
+      }
 
       const result = await this.service.searchTickets(
         filters,
@@ -241,10 +344,12 @@ export class TicketController {
   ): Promise<void> => {
     try {
       const dto: UpdateTicketDTO = req.body;
+      const actorId = req.user?._id?.toString();
 
       const ticket = await this.service.updateTicket(
         req.params.ticketId,
-        dto
+        dto,
+        actorId
       );
 
       res.status(200).json({
@@ -265,10 +370,12 @@ export class TicketController {
   ): Promise<void> => {
     try {
       const { status } = req.body;
+      const actorId = req.user?._id?.toString();
 
       const ticket = await this.service.updateStatus(
         req.params.ticketId,
-        status
+        status,
+        actorId
       );
 
       res.status(200).json({
@@ -289,16 +396,43 @@ export class TicketController {
   ): Promise<void> => {
     try {
       const { assigneeId } = req.body;
+      const actorId = req.user?._id?.toString();
 
       const ticket = await this.service.assignTicket(
         req.params.ticketId,
-        assigneeId
+        assigneeId,
+        actorId
       );
 
       res.status(200).json({
         success: true,
         message: "Ticket assigned successfully",
         data: ticket,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // GET /api/tickets/:ticketId/activity
+  getTicketActivities = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      let activities = await ticketActivityRepository.findByTicketId(
+        req.params.ticketId
+      );
+
+      const isInternalUser = req.user?.isPlatformAdmin || req.user?.userType === "internal";
+      if (!isInternalUser) {
+        activities = activities.filter((act) => act.action !== "internal_note_added");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: activities,
       });
     } catch (error) {
       next(error);
@@ -404,3 +538,15 @@ export const assignTicket =
 
 export const archiveTicket =
   ticketController.archiveTicket;
+
+export const getTicketActivities =
+  ticketController.getTicketActivities;
+
+export const getPresignedUploadUrl =
+  ticketController.getPresignedUploadUrl;
+
+export const getEvidenceViewUrl =
+  ticketController.getEvidenceViewUrl;
+
+export const streamEvidenceFile =
+  ticketController.streamEvidenceFile;

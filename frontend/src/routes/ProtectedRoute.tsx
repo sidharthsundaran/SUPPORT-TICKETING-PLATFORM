@@ -25,7 +25,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={loginPath ?? '/login'} replace />;
   }
 
-  if (requiredUserType && user.userType !== requiredUserType) {
+  if (requiredUserType && user.userType !== requiredUserType && !user.isPlatformAdmin) {
     return <Navigate to="/unauthorized" replace />;
   }
 

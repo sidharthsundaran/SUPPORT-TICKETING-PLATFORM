@@ -8,12 +8,27 @@ export type ProjectRole =
 
 export type UserType = 'internal' | 'client';
 
+export interface ProjectConfigItem {
+  name: string;
+  isActive: boolean;
+}
+
 export interface Project {
   _id: string;
   name: string;
+  code: string;
   description?: string;
   ownerId: string;
+  status: 'active' | 'inactive';
   isActive: boolean;
+  issueTypes?: ProjectConfigItem[];
+  modules?: ProjectConfigItem[];
+  applicationUrls?: {
+    production?: string;
+    uat?: string;
+    development?: string;
+  };
+  allowedEmailDomains?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -38,13 +53,18 @@ export interface ProjectMembership {
 
 export interface CreateProjectPayload {
   name: string;
+  code?: string;
   description?: string;
 }
 
 export interface UpdateProjectPayload {
   name?: string;
+  code?: string;
   description?: string;
+  status?: 'active' | 'inactive';
   isActive?: boolean;
+  issueTypes?: ProjectConfigItem[];
+  modules?: ProjectConfigItem[];
 }
 
 export interface AddMemberPayload {

@@ -2,12 +2,12 @@ import Ticket, {
   ITicket,
   TicketStatus,
   TicketSeverity,
+  ITicketEvidenceFile,
 } from "../models/Ticket.js";
 
 export interface CreateTicketData {
   ticketNumber: string;
   projectId: string;
-  categoryId: string;
   requesterId: string;
   clientOrganisation?: string;
 
@@ -21,6 +21,7 @@ export interface CreateTicketData {
 
   applicationUrl?: string;
   pageUrl?: string;
+  evidenceFiles?: ITicketEvidenceFile[];
 
   sessionContext?: {
     browser?: string;
@@ -28,15 +29,22 @@ export interface CreateTicketData {
     device?: string;
     timezone?: string;
   };
+
+  slaFirstResponseDueAt?: Date;
+  slaResolutionDueAt?: Date;
+  slaFirstResponseStatus?: "pending" | "met" | "breached";
+  slaResolutionStatus?: "within_sla" | "approaching_breach" | "breached";
 }
 
 export interface TicketFilters {
   projectId?: string;
+  projectIds?: string[];
   requesterId?: string;
   assigneeId?: string;
-  categoryId?: string;
   status?: TicketStatus;
   severity?: TicketSeverity;
+  issueType?: string;
+  module?: string;
   clientOrganisation?: string;
   search?: string;
   includeArchived?: boolean;
@@ -79,7 +87,6 @@ export class TicketRepository {
   ): Promise<ITicket | null> {
     return Ticket.findById(ticketId)
       .populate("projectId", "name")
-      .populate("categoryId", "name description")
       .populate("requesterId", "name email userType")
       .populate("assigneeId", "name email");
   }
@@ -104,11 +111,13 @@ export class TicketRepository {
   ): Promise<PaginatedResult<ITicket>> {
     const {
       projectId,
+      projectIds,
       requesterId,
       assigneeId,
-      categoryId,
       status,
       severity,
+      issueType,
+      module,
       clientOrganisation,
       search,
       includeArchived = false,
@@ -122,16 +131,26 @@ export class TicketRepository {
       query.isArchived = false;
     }
 
-    if (projectId) query.projectId = projectId;
+    if (projectIds && projectIds.length > 0) {
+      query.projectId = { $in: projectIds };
+    } else if (projectId) {
+      query.projectId = projectId;
+    }
     if (requesterId) query.requesterId = requesterId;
     if (assigneeId) query.assigneeId = assigneeId;
-    if (categoryId) query.categoryId = categoryId;
     if (status) query.status = status;
     if (severity) query.severity = severity;
+    if (issueType) query.issueType = issueType;
+    if (module) query.module = module;
     if (clientOrganisation) query.clientOrganisation = clientOrganisation;
 
     if (search) {
-      query.$text = { $search: search };
+      const searchRegex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { title: searchRegex },
+        { ticketNumber: searchRegex },
+        { description: searchRegex },
+      ];
     }
 
     if (startDate || endDate) {
@@ -150,7 +169,7 @@ export class TicketRepository {
 
     const [data, total] = await Promise.all([
       Ticket.find(query)
-        .populate("categoryId", "name")
+        .populate("projectId", "name code")
         .populate("requesterId", "name email")
         .populate("assigneeId", "name email")
         .sort(sort)

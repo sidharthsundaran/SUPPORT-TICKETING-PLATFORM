@@ -27,7 +27,6 @@ export const Sidebar: React.FC = () => {
         { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Users', href: '/admin/users', icon: Users },
-        { name: 'Categories', href: '/categories', icon: Tag },
         { name: 'Tickets', href: '/tickets', icon: Ticket },
         { name: 'Settings', href: '/admin/settings', icon: Settings },
       ];
@@ -38,7 +37,6 @@ export const Sidebar: React.FC = () => {
         { name: 'Dashboard', href: '/internal/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Tickets', href: '/tickets', icon: Ticket },
-        { name: 'Categories', href: '/categories', icon: Tag },
         { name: 'Profile', href: '/profile', icon: User },
       ];
     }

@@ -18,7 +18,12 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
   }
 
   if (isAuthenticated && user && restrictedForAuth) {
-    const redirectPath = user.userType === 'internal' ? '/internal/dashboard' : '/dashboard';
+    let redirectPath = '/dashboard';
+    if (user.isPlatformAdmin) {
+      redirectPath = '/admin/dashboard';
+    } else if (user.userType === 'internal') {
+      redirectPath = '/internal/dashboard';
+    }
     return <Navigate to={redirectPath} replace />;
   }
 

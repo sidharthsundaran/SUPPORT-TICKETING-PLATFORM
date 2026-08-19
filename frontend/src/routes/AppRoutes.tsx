@@ -8,8 +8,19 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { ProjectsPage } from '../pages/ProjectsPage';
 import ProjectDetailsPage from '../pages/projects/ProjectDetailsPage';
+import TicketsPage from '../pages/tickets/TicketsPage';
+import CreateTicketPage from '../pages/tickets/CreateTicketPage';
+import TicketDetailsPage from '../pages/tickets/TicketDetailsPage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
+import { useAuth } from '../hooks/useAuth';
+
+const RootRedirect: React.FC = () => {
+  const { user } = useAuth();
+  if (user?.isPlatformAdmin) return <Navigate to="/admin/dashboard" replace />;
+  if (user?.userType === 'internal') return <Navigate to="/internal/dashboard" replace />;
+  return <Navigate to="/dashboard" replace />;
+};
 
 export const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
@@ -75,18 +86,10 @@ export const AppRoutes: React.FC = () => {
         {/* Shared / Secondary Nav Routes */}
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailsPage />} />
-        <Route
-          path="/tickets"
-          element={<PlaceholderPage title="Tickets" description="View and manage support tickets." />}
-        />
-        <Route
-          path="/categories"
-          element={
-            <ProtectedRoute requiredUserType="internal">
-              <PlaceholderPage title="Categories" description="Manage support ticket classification categories." />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/tickets/new" element={<CreateTicketPage />} />
+        <Route path="/tickets/:id" element={<TicketDetailsPage />} />
+
         <Route
           path="/admin/users"
           element={
@@ -111,8 +114,8 @@ export const AppRoutes: React.FC = () => {
 
       {/* Standalone Fallback & Unauthorized Routes */}
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 };
