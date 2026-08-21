@@ -322,6 +322,14 @@ export class TicketController {
           } else {
             filters.projectIds = userProjectIds;
           }
+
+          // BR-TRK-002 & BR-ACC-009: Check if client user is a Client Org Admin
+          const orgAdminMembership = activeMemberships.find((m) => m.role === "client_org_admin" && m.clientOrganisation);
+          if (orgAdminMembership) {
+            filters.clientOrganisation = orgAdminMembership.clientOrganisation;
+          } else if (!filters.requesterId) {
+            filters.requesterId = user._id.toString();
+          }
         }
       }
 
@@ -583,6 +591,32 @@ export class TicketController {
       next(error);
     }
   };
+
+  submitSatisfactionRating = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { rating, comment } = req.body;
+
+      if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
+        res.status(400).json({ success: false, message: "A valid rating between 1 and 5 is required" });
+        return;
+      }
+
+      const updated = await this.service.submitSatisfactionRating(id, rating, comment, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: "Thank you for your feedback! Satisfaction rating recorded.",
+        data: updated,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const ticketController = new TicketController();
@@ -590,6 +624,7 @@ export const ticketController = new TicketController();
 export const createTicket = ticketController.createTicket;
 export const getTeamConsoleTickets = ticketController.getTeamConsoleTickets;
 export const bulkUpdateTickets = ticketController.bulkUpdateTickets;
+export const submitSatisfactionRating = ticketController.submitSatisfactionRating;
 
 export const getTicketById =
   ticketController.getTicketById;

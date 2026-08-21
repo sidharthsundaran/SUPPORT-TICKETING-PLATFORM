@@ -29,6 +29,7 @@ export const Sidebar: React.FC = () => {
         { name: 'Team Console', href: '/team-console', icon: Ticket },
         { name: 'My Tickets', href: '/my-tickets', icon: Ticket },
         { name: 'Users', href: '/admin/users', icon: Users },
+        { name: 'Profile', href: '/profile', icon: User },
         { name: 'Settings', href: '/admin/settings', icon: Settings },
       ];
     }

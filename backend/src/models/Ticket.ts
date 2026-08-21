@@ -66,6 +66,11 @@ export interface ITicket extends Document {
   slaResolutionDueAt?: Date;
   slaFirstResponseStatus?: "pending" | "met" | "breached";
   slaResolutionStatus?: "within_sla" | "approaching_breach" | "breached";
+  satisfactionRating?: {
+    rating: number;
+    comment?: string;
+    ratedAt?: Date;
+  };
   slaClock?: {
     pausedAt?: Date;
     totalPausedMs?: number;
@@ -230,6 +235,12 @@ const ticketSchema = new Schema<ITicket>(
       enum: ["within_sla", "approaching_breach", "breached"],
       default: "within_sla",
       index: true,
+    },
+
+    satisfactionRating: {
+      rating: { type: Number, min: 1, max: 5 },
+      comment: { type: String, trim: true },
+      ratedAt: { type: Date, default: Date.now },
     },
 
     slaClock: {

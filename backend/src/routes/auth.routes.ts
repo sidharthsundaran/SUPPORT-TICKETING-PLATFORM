@@ -11,11 +11,12 @@ import {
 } from "../controllers/auth.controller.js";
 
 import authMiddleware from "../middleware/auth.middleware.js";
+import { registerRateLimiter, loginRateLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
 
-router.post("/register", register);
-router.post('/login', login);
+router.post("/register", registerRateLimiter, register);
+router.post('/login', loginRateLimiter, login);
 router.get("/me", authMiddleware, getMe);
 router.get("/users", authMiddleware, getUsers);
 router.post("/refresh", refresh);

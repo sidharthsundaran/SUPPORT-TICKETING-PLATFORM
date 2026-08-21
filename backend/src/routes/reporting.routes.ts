@@ -8,5 +8,6 @@ router.use(authMiddleware);
 
 router.get("/dashboard", reportingController.getDashboardMetrics);
 router.get("/export", reportingController.exportCsv);
+router.get("/export-pdf", reportingController.exportPdf);
 
 export default router;

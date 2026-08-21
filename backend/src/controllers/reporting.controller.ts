@@ -71,6 +71,36 @@ export class ReportingController {
       next(error);
     }
   };
+
+  // GET /api/reports/export-pdf
+  exportPdf = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const user = req.user;
+      if (!user) {
+        throw new BadRequestError("User authentication required");
+      }
+
+      const projectId = req.query.projectId ? String(req.query.projectId) : undefined;
+      const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+
+      const htmlContent = await this.service.exportStyledReport(
+        user,
+        projectId,
+        startDate,
+        endDate
+      );
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(200).send(htmlContent);
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const reportingController = new ReportingController();

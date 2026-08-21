@@ -18,6 +18,7 @@ import {
   streamEvidenceFile,
   getTeamConsoleTickets,
   bulkUpdateTickets,
+  submitSatisfactionRating,
 } from "../controllers/ticket.controller.js";
 
 import authMiddleware from "../middleware/auth.middleware.js";
@@ -67,6 +68,9 @@ router.get("/:ticketId/activity", getTicketActivities);
 // Ticket comments / internal notes
 router.get("/:ticketId/comments", getComments);
 router.post("/:ticketId/comments", createComment);
+
+// Satisfaction rating for resolved/closed tickets (BR-TRK-006)
+router.post("/:id/satisfaction-rating", submitSatisfactionRating);
 
 // Ticket by ID
 router.get("/:ticketId", getTicketById);

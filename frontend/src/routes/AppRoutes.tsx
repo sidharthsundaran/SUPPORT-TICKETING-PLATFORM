@@ -16,8 +16,8 @@ import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { useAuth } from '../hooks/useAuth';
 
 import UsersPage from '../pages/admin/UsersPage';
-
 import { TeamConsolePage } from '../pages/tickets/TeamConsolePage';
+import { ProfilePage } from '../pages/ProfilePage';
 
 const RootRedirect: React.FC = () => {
   const { user } = useAuth();
@@ -95,6 +95,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/team-console" element={<TeamConsolePage />} />
         <Route path="/tickets/new" element={<CreateTicketPage />} />
         <Route path="/tickets/:id" element={<TicketDetailsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
 
         <Route
           path="/admin/users"

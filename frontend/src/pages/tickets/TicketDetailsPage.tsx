@@ -43,6 +43,7 @@ import EditTicketModal from "../../features/tickets/components/EditTicketModal";
 import TicketActivityFeed from "../../features/tickets/components/TicketActivityFeed";
 import TicketComments from "../../features/tickets/components/TicketComments";
 import TicketSlaCard from "../../features/tickets/components/TicketSlaCard";
+import { SatisfactionRatingWidget } from "../../features/tickets/components/SatisfactionRatingWidget";
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: "new", label: "New" },
@@ -137,7 +138,7 @@ export const TicketDetailsPage: React.FC = () => {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const { data: response, isLoading, isError } = useGetTicketByIdQuery(id || "", {
+  const { data: response, isLoading, isError, refetch } = useGetTicketByIdQuery(id || "", {
     skip: !id,
   });
 
@@ -433,6 +434,15 @@ export const TicketDetailsPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* CSAT Rating Prompt for Resolved / Closed Tickets (BR-TRK-006) */}
+            {(ticket.status === "resolved" || ticket.status === "closed") && (
+              <SatisfactionRatingWidget
+                ticketId={ticket._id}
+                existingRating={ticket.satisfactionRating}
+                onSuccess={() => refetch()}
+              />
             )}
 
             {/* Comments & Internal Notes Section */}

@@ -139,6 +139,34 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ preset }) => {
     }
   };
 
+  const handleExportPdf = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+      const params = new URLSearchParams();
+      if (selectedProjectId) params.append("projectId", selectedProjectId);
+
+      const res = await fetch(`${baseUrl}/reports/export-pdf?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate PDF report");
+
+      const htmlText = await res.text();
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(htmlText);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    } catch (err) {
+      console.error("[PDF Export Error]:", err);
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans">
       {/* Page Header */}
@@ -167,7 +195,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ preset }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={handleExportCsv}
@@ -175,6 +203,15 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ preset }) => {
           >
             <Download className="w-4 h-4 text-indigo-600" />
             Export CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs active:scale-[0.98] transition cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-rose-600" />
+            Export PDF
           </button>
 
           <button

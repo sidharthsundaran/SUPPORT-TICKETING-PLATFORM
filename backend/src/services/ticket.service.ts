@@ -503,6 +503,40 @@ export class TicketService {
     return updated;
   }
 
+  async submitSatisfactionRating(
+    ticketId: string,
+    rating: number,
+    comment?: string,
+    user?: any
+  ): Promise<ITicket> {
+    const ticket = await this.getRawTicketById(ticketId);
+
+    if (ticket.status !== "resolved" && ticket.status !== "closed") {
+      throw new BadRequestError("Satisfaction rating can only be submitted for resolved or closed tickets.");
+    }
+
+    if (rating < 1 || rating > 5) {
+      throw new BadRequestError("Rating must be between 1 and 5.");
+    }
+
+    ticket.satisfactionRating = {
+      rating,
+      comment: comment?.trim(),
+      ratedAt: new Date(),
+    };
+
+    await ticket.save();
+
+    await this.activityRepo.create({
+      ticketId: ticket._id.toString(),
+      actorId: user?._id?.toString() || ticket.requesterId.toString(),
+      action: "details_updated",
+      metadata: { satisfactionRating: ticket.satisfactionRating },
+    });
+
+    return ticket;
+  }
+
   async archiveTicket(ticketId: string): Promise<ITicket> {
     await this.getRawTicketById(ticketId);
 

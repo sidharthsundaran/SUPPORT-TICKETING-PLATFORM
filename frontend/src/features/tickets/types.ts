@@ -68,6 +68,11 @@ export interface Ticket {
   slaResolutionDueAt?: string;
   slaFirstResponseStatus?: 'pending' | 'met' | 'breached';
   slaResolutionStatus?: SlaStatus;
+  satisfactionRating?: {
+    rating: number;
+    comment?: string;
+    ratedAt?: string;
+  };
   slaClock?: {
     pausedAt?: string;
     totalPausedMs?: number;
