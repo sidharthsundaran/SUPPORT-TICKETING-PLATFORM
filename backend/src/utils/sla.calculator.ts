@@ -11,7 +11,6 @@ export function addBusinessDays(startDate: Date, days: number): Date {
   while (added < days) {
     result.setDate(result.getDate() + 1);
     const dayOfWeek = result.getDay();
-    // 0 is Sunday, 6 is Saturday
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       added++;
     }
@@ -77,4 +76,58 @@ export function calculateResolutionDueAt(
   const due = new Date(startDate.getTime());
   due.setHours(due.getHours() + hours);
   return due;
+}
+
+export interface TicketSlaInfo {
+  state: "within_sla" | "approaching_breach" | "breached";
+  firstResponseDueAt: Date;
+  resolutionDueAt: Date;
+  responseRemainingSeconds: number;
+  resolutionRemainingSeconds: number;
+  isFirstResponseBreached: boolean;
+  isResolutionBreached: boolean;
+}
+
+/**
+ * Computes full real-time SLA metrics for a given ticket.
+ */
+export function calculateTicketSlaInfo(
+  ticket: { createdAt: Date; severity: TicketSeverity; firstRespondedAt?: Date; resolvedAt?: Date },
+  projectMatrix?: Partial<Record<TicketSeverity, ISlaTarget>>
+): TicketSlaInfo {
+  const createdDate = new Date(ticket.createdAt);
+  const firstResponseDueAt = calculateFirstResponseDueAt(createdDate, ticket.severity, projectMatrix);
+  const resolutionDueAt = calculateResolutionDueAt(createdDate, ticket.severity, projectMatrix);
+
+  const now = new Date().getTime();
+
+  const responseDiffMs = firstResponseDueAt.getTime() - (ticket.firstRespondedAt ? new Date(ticket.firstRespondedAt).getTime() : now);
+  const resolutionDiffMs = resolutionDueAt.getTime() - (ticket.resolvedAt ? new Date(ticket.resolvedAt).getTime() : now);
+
+  const responseRemainingSeconds = Math.floor(responseDiffMs / 1000);
+  const resolutionRemainingSeconds = Math.floor(resolutionDiffMs / 1000);
+
+  const isFirstResponseBreached = !ticket.firstRespondedAt && responseRemainingSeconds < 0;
+  const isResolutionBreached = !ticket.resolvedAt && resolutionRemainingSeconds < 0;
+
+  const isApproachingBreach =
+    (!ticket.firstRespondedAt && responseRemainingSeconds > 0 && responseRemainingSeconds <= 7200) ||
+    (!ticket.resolvedAt && resolutionRemainingSeconds > 0 && resolutionRemainingSeconds <= 14400);
+
+  let state: "within_sla" | "approaching_breach" | "breached" = "within_sla";
+  if (isFirstResponseBreached || isResolutionBreached) {
+    state = "breached";
+  } else if (isApproachingBreach) {
+    state = "approaching_breach";
+  }
+
+  return {
+    state,
+    firstResponseDueAt,
+    resolutionDueAt,
+    responseRemainingSeconds,
+    resolutionRemainingSeconds,
+    isFirstResponseBreached,
+    isResolutionBreached,
+  };
 }

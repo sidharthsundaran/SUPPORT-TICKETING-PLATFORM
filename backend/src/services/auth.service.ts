@@ -152,8 +152,57 @@ export class AuthService {
         userType: user.userType,
         isPlatformAdmin: user.isPlatformAdmin,
         isActive: user.isActive,
+        isEmailVerified: Boolean(user.isEmailVerified),
       },
     };
+  }
+
+  async sendVerificationCode(user: IUser): Promise<{ message: string }> {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    user.emailVerificationCode = code;
+    user.emailVerificationExpires = expires;
+    await user.save();
+
+    const { emailService } = await import("./email.service.js");
+    await emailService.sendEmail({
+      to: user.email,
+      subject: "[Action Required] Verify Your Email - Support Platform",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc;">
+          <h2 style="color: #4f46e5;">Email Verification Code</h2>
+          <p>Hello ${user.name},</p>
+          <p>Your 6-digit email verification code for the Support Platform is:</p>
+          <div style="font-size: 28px; font-weight: bold; color: #4f46e5; letter-spacing: 4px; margin: 16px 0;">${code}</div>
+          <p>This code will expire in 15 minutes.</p>
+          <p>If you did not request this code, you can safely ignore this email.</p>
+        </div>
+      `,
+    });
+
+    return { message: `Verification code sent to ${user.email}` };
+  }
+
+  async verifyEmailCode(user: IUser, code: string): Promise<{ success: boolean; message: string }> {
+    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+      throw new BadRequestError("No verification code requested. Please click Resend Code.");
+    }
+
+    if (new Date() > user.emailVerificationExpires) {
+      throw new BadRequestError("Verification code has expired. Please request a new code.");
+    }
+
+    if (user.emailVerificationCode.trim() !== code.trim()) {
+      throw new BadRequestError("Invalid 6-digit verification code.");
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationCode = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    return { success: true, message: "Email verified successfully!" };
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AuthResult> {

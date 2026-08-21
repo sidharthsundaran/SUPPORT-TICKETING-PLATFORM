@@ -175,6 +175,40 @@ export const ticketApi = baseApi.injectEndpoints({
     getEvidenceViewUrl: builder.query<ApiResponse<{ url: string }>, string>({
       query: (key) => `/tickets/evidence-url?key=${encodeURIComponent(key)}`,
     }),
+
+    getTeamConsoleTickets: builder.query<
+      PaginatedTicketsResponse,
+      TicketQueryParams & { preset?: string; clientOrganisation?: string; slaState?: string }
+    >({
+      query: (params) => {
+        const queryParams = new URLSearchParams();
+        if (params.projectId) queryParams.append('projectId', params.projectId);
+        if (params.search?.trim()) queryParams.append('search', params.search.trim());
+        if (params.status) queryParams.append('status', params.status);
+        if (params.severity) queryParams.append('severity', params.severity);
+        if (params.issueType) queryParams.append('issueType', params.issueType);
+        if (params.module) queryParams.append('module', params.module);
+        if (params.clientOrganisation) queryParams.append('clientOrganisation', params.clientOrganisation);
+        if (params.preset) queryParams.append('preset', params.preset);
+        if (params.slaState) queryParams.append('slaState', params.slaState);
+        queryParams.append('page', String(params.page ?? 1));
+        queryParams.append('limit', String(params.limit ?? 20));
+        return `/tickets/team-console?${queryParams.toString()}`;
+      },
+      providesTags: ['Ticket'],
+    }),
+
+    bulkUpdateTickets: builder.mutation<
+      ApiResponse<{ updatedCount: number }>,
+      { ticketIds: string[]; update: { assigneeId?: string | null; status?: TicketStatus; tags?: string[] } }
+    >({
+      query: (body) => ({
+        url: '/tickets/bulk-update',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Ticket'],
+    }),
   }),
   overrideExisting: false,
 });
@@ -193,4 +227,6 @@ export const {
   useGetTicketCommentsQuery,
   useCreateTicketCommentMutation,
   useSearchTicketsQuery,
+  useGetTeamConsoleTicketsQuery,
+  useBulkUpdateTicketsMutation,
 } = ticketApi;

@@ -98,6 +98,7 @@ export interface PaginatedTicketsResponse {
 
 export interface TicketQueryParams {
   projectId?: string;
+  requesterId?: string;
   page?: number;
   limit?: number;
   search?: string;

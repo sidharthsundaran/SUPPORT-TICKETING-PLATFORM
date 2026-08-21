@@ -107,6 +107,14 @@ export class TicketController {
         return;
       }
 
+      if (!req.user.isEmailVerified) {
+        res.status(403).json({
+          success: false,
+          message: "Email verification is required before raising support tickets. Please verify your email.",
+        });
+        return;
+      }
+
       const dto: CreateTicketDTO = {
         ...req.body,
         requesterId: req.user._id.toString(),
@@ -290,11 +298,12 @@ export class TicketController {
 
       const options = this.getPaginationOptions(req);
 
-      // Scoping logic: client users must only see tickets from projects they belong to
+      // Scoping logic: client users must only see tickets from projects they belong to with active membership status
       const user = req.user;
       if (user && !user.isPlatformAdmin) {
         const memberships = await projectMembershipRepository.findByUser(user._id.toString());
-        const userProjectIds = memberships.map((m) =>
+        const activeMemberships = memberships.filter((m) => m.status === undefined || m.status === "active");
+        const userProjectIds = activeMemberships.map((m) =>
           typeof m.projectId === "object" && (m.projectId as any)._id
             ? (m.projectId as any)._id.toString()
             : m.projectId.toString()
@@ -502,12 +511,85 @@ export class TicketController {
       ? undefined
       : date;
   }
+  getTeamConsoleTickets = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const filters: TicketFilters & { preset?: string } = {
+        projectId: this.getStringQuery(req.query.projectId),
+        requesterId: this.getStringQuery(req.query.requesterId),
+        assigneeId: this.getStringQuery(req.query.assigneeId),
+        status: this.getStringQuery(req.query.status) as TicketStatus | undefined,
+        severity: this.getStringQuery(req.query.severity) as TicketFilters["severity"] | undefined,
+        issueType: this.getStringQuery(req.query.issueType),
+        module: this.getStringQuery(req.query.module),
+        clientOrganisation: this.getStringQuery(req.query.clientOrganisation),
+        search: this.getStringQuery(req.query.search),
+        preset: this.getStringQuery(req.query.preset),
+        startDate: this.parseDate(req.query.startDate),
+        endDate: this.parseDate(req.query.endDate),
+      };
+
+      const options = this.getPaginationOptions(req);
+      const result = await this.service.getTeamConsoleTickets(req.user, filters, options);
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  bulkUpdateTickets = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const { ticketIds, update } = req.body;
+      if (!ticketIds || !Array.isArray(ticketIds) || ticketIds.length === 0) {
+        res.status(400).json({ success: false, message: "ticketIds array is required" });
+        return;
+      }
+
+      const result = await this.service.bulkUpdateTickets(ticketIds, update || {}, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully bulk-updated ${result.updatedCount} ticket(s)`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const ticketController = new TicketController();
 
-export const createTicket =
-  ticketController.createTicket;
+export const createTicket = ticketController.createTicket;
+export const getTeamConsoleTickets = ticketController.getTeamConsoleTickets;
+export const bulkUpdateTickets = ticketController.bulkUpdateTickets;
 
 export const getTicketById =
   ticketController.getTicketById;

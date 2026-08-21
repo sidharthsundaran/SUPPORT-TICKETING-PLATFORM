@@ -1,6 +1,7 @@
 import ProjectMembership, {
   IProjectMembership,
   ProjectRole,
+  MembershipStatus,
 } from "../models/ProjectMembership.js";
 import { Types } from "mongoose";
 
@@ -8,6 +9,7 @@ export interface CreateMembershipData {
   userId: Types.ObjectId | string;
   projectId: Types.ObjectId | string;
   role: ProjectRole;
+  status?: MembershipStatus;
   clientOrganisation?: string;
   receivesNewTicketAlerts?: boolean;
 }
@@ -18,6 +20,7 @@ export class ProjectMembershipRepository {
       userId: data.userId,
       projectId: data.projectId,
       role: data.role,
+      status: data.status || "active",
       clientOrganisation: data.clientOrganisation,
       receivesNewTicketAlerts: data.receivesNewTicketAlerts ?? false,
     });
@@ -37,46 +40,39 @@ export class ProjectMembershipRepository {
   async findByUser(userId: string): Promise<IProjectMembership[]> {
     return ProjectMembership.find({ userId }).populate("projectId", "name description isActive");
   }
+
   async findByProjectAndRole(
     projectId: string,
     role: ProjectRole
   ): Promise<IProjectMembership[]> {
-    return ProjectMembership.find({
-      projectId,
-      role,
-    })
-      .populate("userId", "name email userType")
-      .sort({ createdAt: 1 });
+    return ProjectMembership.find({ projectId, role }).populate("userId", "name email userType");
   }
-   async updateById(
-    id: string,
-    updateData: Partial<IProjectMembership>
-  ): Promise<IProjectMembership | null> {
-    return ProjectMembership.findByIdAndUpdate(
-      id,
-      updateData,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
-  }
-
 
   async updateRole(
-    id: string,
+    membershipId: string,
     role: ProjectRole,
     clientOrganisation?: string
   ): Promise<IProjectMembership | null> {
-    return ProjectMembership.findByIdAndUpdate(
-      id,
-      { role, clientOrganisation },
-      { new: true, runValidators: true }
-    );
+    const updateData: Record<string, any> = { role };
+    if (clientOrganisation !== undefined) {
+      updateData.clientOrganisation = clientOrganisation;
+    }
+    return ProjectMembership.findByIdAndUpdate(membershipId, updateData, { new: true });
   }
 
-  async deleteById(id: string): Promise<IProjectMembership | null> {
-    return ProjectMembership.findByIdAndDelete(id);
+  async updateById(
+    membershipId: string,
+    updateData: Partial<IProjectMembership>
+  ): Promise<IProjectMembership | null> {
+    return ProjectMembership.findByIdAndUpdate(membershipId, updateData, { new: true });
+  }
+
+  async deleteById(membershipId: string): Promise<IProjectMembership | null> {
+    return ProjectMembership.findByIdAndDelete(membershipId);
+  }
+
+  async find(query: Record<string, any>, options: Record<string, any> = {}): Promise<IProjectMembership[]> {
+    return ProjectMembership.find(query).populate("userId", "name email userType");
   }
 }
 

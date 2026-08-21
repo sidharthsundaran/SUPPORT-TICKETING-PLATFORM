@@ -92,6 +92,28 @@ export class AdminController {
       next(error);
     }
   };
+
+  purgeClientOrgData = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const actor = req.user;
+      if (!actor) throw new BadRequestError("Authentication required");
+
+      const { orgName } = req.params;
+      const result = await this.service.deleteClientOrgData(orgName, actor);
+
+      res.status(200).json({
+        success: true,
+        message: `Permanently deleted ${result.deletedTicketsCount} ticket(s) and associated data for client organisation '${orgName}'`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const adminController = new AdminController();

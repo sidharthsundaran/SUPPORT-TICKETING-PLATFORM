@@ -45,6 +45,7 @@ export interface ProjectMembership {
   userId: ProjectMemberUser | string;
   projectId: Project | string;
   role: ProjectRole;
+  status?: 'pending' | 'active' | 'rejected' | 'deactivated';
   clientOrganisation?: string;
   receivesNewTicketAlerts: boolean;
   createdAt: string;

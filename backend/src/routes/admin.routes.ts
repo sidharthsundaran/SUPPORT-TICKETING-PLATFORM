@@ -11,5 +11,6 @@ router.use(authMiddleware, platformAdminMiddleware);
 router.get("/users", adminController.getUsers);
 router.patch("/users/:id/status", adminController.updateStatus);
 router.patch("/users/:id/user-type", adminController.updateUserType);
+router.delete("/organisations/:orgName/data", adminController.purgeClientOrgData);
 
 export default router;

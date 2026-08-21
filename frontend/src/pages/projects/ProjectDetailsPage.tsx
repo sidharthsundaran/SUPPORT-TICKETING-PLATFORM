@@ -30,6 +30,7 @@ import type { ProjectMembership, ProjectMemberUser } from '../../features/projec
 import { ProjectMembersModal } from '../../features/projects/components/ProjectMembersModal';
 import { AddMemberModal } from '../../features/projects/components/AddMembersModal';
 import { EditProjectModal } from '../../features/projects/components/EditProjectModal';
+import { AccessApprovalQueueModal } from '../../features/projects/components/AccessApprovalQueueModal';
 
 const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +41,7 @@ const ProjectDetailsPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [isAccessQueueOpen, setIsAccessQueueOpen] = useState(false);
 
   const {
     data: project,
@@ -247,6 +249,15 @@ const ProjectDetailsPage: React.FC = () => {
             {/* Action Buttons Header */}
             {canEditProject && (
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAccessQueueOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition cursor-pointer active:scale-[0.98]"
+                >
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <span>Access Requests Queue</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(true)}
@@ -489,6 +500,13 @@ const ProjectDetailsPage: React.FC = () => {
         projectName={project.name}
         isOpen={isMembersModalOpen}
         onClose={() => setIsMembersModalOpen(false)}
+      />
+
+      <AccessApprovalQueueModal
+        projectId={project._id}
+        projectName={project.name}
+        isOpen={isAccessQueueOpen}
+        onClose={() => setIsAccessQueueOpen(false)}
       />
     </div>
   );

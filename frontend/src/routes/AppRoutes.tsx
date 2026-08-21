@@ -17,6 +17,8 @@ import { useAuth } from '../hooks/useAuth';
 
 import UsersPage from '../pages/admin/UsersPage';
 
+import { TeamConsolePage } from '../pages/tickets/TeamConsolePage';
+
 const RootRedirect: React.FC = () => {
   const { user } = useAuth();
   if (user?.isPlatformAdmin) return <Navigate to="/admin/dashboard" replace />;
@@ -89,6 +91,8 @@ export const AppRoutes: React.FC = () => {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailsPage />} />
         <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/my-tickets" element={<TicketsPage preset="my" />} />
+        <Route path="/team-console" element={<TeamConsolePage />} />
         <Route path="/tickets/new" element={<CreateTicketPage />} />
         <Route path="/tickets/:id" element={<TicketDetailsPage />} />
 

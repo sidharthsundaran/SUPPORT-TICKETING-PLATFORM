@@ -26,8 +26,9 @@ export const Sidebar: React.FC = () => {
       return [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
+        { name: 'Team Console', href: '/team-console', icon: Ticket },
+        { name: 'My Tickets', href: '/my-tickets', icon: Ticket },
         { name: 'Users', href: '/admin/users', icon: Users },
-        { name: 'Tickets', href: '/tickets', icon: Ticket },
         { name: 'Settings', href: '/admin/settings', icon: Settings },
       ];
     }
@@ -36,7 +37,8 @@ export const Sidebar: React.FC = () => {
       return [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
-        { name: 'Tickets', href: '/tickets', icon: Ticket },
+        { name: 'Team Console', href: '/team-console', icon: Ticket },
+        { name: 'My Tickets', href: '/my-tickets', icon: Ticket },
         { name: 'Profile', href: '/profile', icon: User },
       ];
     }
@@ -45,7 +47,7 @@ export const Sidebar: React.FC = () => {
     return [
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { name: 'Projects', href: '/projects', icon: FolderKanban },
-      { name: 'My Tickets', href: '/tickets', icon: Ticket },
+      { name: 'My Tickets', href: '/my-tickets', icon: Ticket },
       { name: 'Profile', href: '/profile', icon: User },
     ];
   };

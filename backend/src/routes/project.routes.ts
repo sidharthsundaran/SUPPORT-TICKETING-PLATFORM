@@ -30,4 +30,10 @@ router.delete(
   projectController.removeMember
 );
 
+router.get("/:id/pending-memberships", requireProjectAdmin, projectController.getPendingMemberships);
+router.patch("/members/:membershipId/approve", requireProjectAdmin, projectController.approveMember);
+router.patch("/members/:membershipId/reject", requireProjectAdmin, projectController.rejectMember);
+router.patch("/members/:membershipId/deactivate", requireProjectAdmin, projectController.deactivateMember);
+router.patch("/members/:membershipId/reactivate", requireProjectAdmin, projectController.reactivateMember);
+
 export default router;

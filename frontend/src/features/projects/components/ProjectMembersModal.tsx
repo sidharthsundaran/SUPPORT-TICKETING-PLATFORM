@@ -60,6 +60,28 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
     }
   };
 
+  const { token } = useAuth();
+
+  const handleToggleStatus = async (membershipId: string, currentStatus?: string) => {
+    const isDeactivating = currentStatus !== 'deactivated';
+    const action = isDeactivating ? 'deactivate' : 'reactivate';
+    const endpoint = isDeactivating ? 'deactivate' : 'reactivate';
+
+    if (confirm(`Are you sure you want to ${action} this member's access to this project?`)) {
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${baseUrl}/projects/members/${membershipId}/${endpoint}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error();
+        window.location.reload();
+      } catch (err) {
+        alert(`Failed to ${action} member access.`);
+      }
+    }
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
@@ -68,7 +90,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
           onClick={onClose}
         />
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl max-w-lg w-full relative z-10 animate-scaleUp max-h-[85vh] flex flex-col">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl max-w-xl w-full relative z-10 animate-scaleUp max-h-[85vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4 shrink-0">
             <div className="flex items-center gap-2.5">
@@ -116,19 +138,32 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                     ? (membership.userId as ProjectMemberUser)
                     : null;
 
+                const isDeactivated = membership.status === 'deactivated';
+
                 return (
                   <div
                     key={membership._id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition text-xs"
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition text-xs ${
+                      isDeactivated
+                        ? 'bg-rose-50/50 border-rose-200/80 opacity-75'
+                        : 'bg-slate-50 border-slate-200/80 hover:border-slate-300'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                         {memberUser ? memberUser.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 leading-tight">
-                          {memberUser ? memberUser.name : 'Unknown User'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-slate-900 leading-tight">
+                            {memberUser ? memberUser.name : 'Unknown User'}
+                          </p>
+                          {isDeactivated && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">
+                              Deactivated
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-slate-400 leading-tight mt-0.5">
                           {memberUser?.email}
                         </p>
@@ -148,15 +183,29 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                       </span>
 
                       {isPlatformAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(membership._id)}
-                          disabled={isRemoving}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                          title="Remove Member"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(membership._id, membership.status)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                              isDeactivated
+                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                            }`}
+                          >
+                            {isDeactivated ? 'Reactivate' : 'Deactivate'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(membership._id)}
+                            disabled={isRemoving}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            title="Remove Member"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

@@ -23,6 +23,7 @@ import {
   ProjectRole,
   IProjectMembership,
 } from "../models/ProjectMembership.js";
+import AuditLog from "../models/AuditLog.js";
 
 const VALID_ROLES: ProjectRole[] = [
   "project_admin",
@@ -84,15 +85,99 @@ export class ProjectMembershipService {
 
     this.validateOrganisation(role, dto.clientOrganisation);
 
+    const project = await this.validateProject(projectId);
+    const userDomain = user.email.split("@")[1]?.toLowerCase();
+    const allowedDomains = project.allowedEmailDomains || [];
+
+    // Auto-approve if userType is internal OR domain matches allowedEmailDomains, else pending (BR-ACC-005 & BR-ACC-008)
+    const isDomainMatch = userDomain && allowedDomains.includes(userDomain);
+    const status = user.userType === "internal" || isDomainMatch ? "active" : "pending";
+
     return this.membershipRepo.create({
       userId,
       projectId,
       role,
-      clientOrganisation:
-        dto.clientOrganisation?.trim(),
-      receivesNewTicketAlerts:
-        dto.receivesNewTicketAlerts ?? false,
+      status,
+      clientOrganisation: dto.clientOrganisation?.trim(),
+      receivesNewTicketAlerts: dto.receivesNewTicketAlerts ?? false,
     });
+  }
+
+  async getPendingMemberships(projectId: string): Promise<IProjectMembership[]> {
+    await this.validateProject(projectId);
+    return this.membershipRepo.find({ projectId, status: "pending" } as any, {});
+  }
+
+  async approveMembership(membershipId: string, actorId?: string): Promise<IProjectMembership> {
+    const updated = await this.membershipRepo.updateById(membershipId, { status: "active" } as any);
+    if (!updated) throw new NotFoundError("Project membership not found");
+
+    try {
+      await AuditLog.create({
+        action: "PROJECT_ACCESS_APPROVAL",
+        actorId: actorId || updated.userId,
+        targetId: updated._id,
+        details: { action: "approve", previousStatus: "pending", newStatus: "active", projectId: updated.projectId },
+      });
+    } catch (err) {
+      console.error("[AuditLog Error]:", err);
+    }
+
+    return updated;
+  }
+
+  async rejectMembership(membershipId: string, actorId?: string): Promise<IProjectMembership> {
+    const updated = await this.membershipRepo.updateById(membershipId, { status: "rejected" } as any);
+    if (!updated) throw new NotFoundError("Project membership not found");
+
+    try {
+      await AuditLog.create({
+        action: "PROJECT_ACCESS_APPROVAL",
+        actorId: actorId || updated.userId,
+        targetId: updated._id,
+        details: { action: "reject", previousStatus: "pending", newStatus: "rejected", projectId: updated.projectId },
+      });
+    } catch (err) {
+      console.error("[AuditLog Error]:", err);
+    }
+
+    return updated;
+  }
+
+  async deactivateMembership(membershipId: string, actorId?: string): Promise<IProjectMembership> {
+    const updated = await this.membershipRepo.updateById(membershipId, { status: "deactivated" } as any);
+    if (!updated) throw new NotFoundError("Project membership not found");
+
+    try {
+      await AuditLog.create({
+        action: "PROJECT_ACCESS_APPROVAL",
+        actorId: actorId || updated.userId,
+        targetId: updated._id,
+        details: { action: "deactivate", previousStatus: "active", newStatus: "deactivated", projectId: updated.projectId },
+      });
+    } catch (err) {
+      console.error("[AuditLog Error]:", err);
+    }
+
+    return updated;
+  }
+
+  async reactivateMembership(membershipId: string, actorId?: string): Promise<IProjectMembership> {
+    const updated = await this.membershipRepo.updateById(membershipId, { status: "active" } as any);
+    if (!updated) throw new NotFoundError("Project membership not found");
+
+    try {
+      await AuditLog.create({
+        action: "PROJECT_ACCESS_APPROVAL",
+        actorId: actorId || updated.userId,
+        targetId: updated._id,
+        details: { action: "reactivate", previousStatus: "deactivated", newStatus: "active", projectId: updated.projectId },
+      });
+    } catch (err) {
+      console.error("[AuditLog Error]:", err);
+    }
+
+    return updated;
   }
 
   async getProjectMembers(

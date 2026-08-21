@@ -8,6 +8,7 @@ export interface IUser {
   userType: UserType;
   isPlatformAdmin: boolean;
   isActive: boolean;
+  isEmailVerified?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -165,6 +165,85 @@ export class ProjectController {
       next(error);
     }
   };
+
+  getPendingMemberships = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { projectMembershipService } = await import("../services/project-membership.service.js");
+      const pending = await projectMembershipService.getPendingMemberships(id);
+      res.status(200).json({ success: true, data: pending });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  approveMember = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { membershipId } = req.params;
+      const actorId = req.user?._id?.toString();
+      const { projectMembershipService } = await import("../services/project-membership.service.js");
+      const updated = await projectMembershipService.approveMembership(membershipId, actorId);
+      res.status(200).json({ success: true, message: "Project access request approved", data: updated });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  rejectMember = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { membershipId } = req.params;
+      const actorId = req.user?._id?.toString();
+      const { projectMembershipService } = await import("../services/project-membership.service.js");
+      const updated = await projectMembershipService.rejectMembership(membershipId, actorId);
+      res.status(200).json({ success: true, message: "Project access request rejected", data: updated });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deactivateMember = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { membershipId } = req.params;
+      const actorId = req.user?._id?.toString();
+      const { projectMembershipService } = await import("../services/project-membership.service.js");
+      const updated = await projectMembershipService.deactivateMembership(membershipId, actorId);
+      res.status(200).json({ success: true, message: "Project member access deactivated", data: updated });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  reactivateMember = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { membershipId } = req.params;
+      const actorId = req.user?._id?.toString();
+      const { projectMembershipService } = await import("../services/project-membership.service.js");
+      const updated = await projectMembershipService.reactivateMembership(membershipId, actorId);
+      res.status(200).json({ success: true, message: "Project member access reactivated", data: updated });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const projectController = new ProjectController();

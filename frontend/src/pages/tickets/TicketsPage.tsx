@@ -25,9 +25,16 @@ import TicketTable from "../../features/tickets/components/TicketTable";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
-export const TicketsPage: React.FC = () => {
+interface TicketsPageProps {
+  preset?: "my" | "team";
+}
+
+export const TicketsPage: React.FC<TicketsPageProps> = ({ preset }) => {
   const navigate = useNavigate();
-  const { isClient, token } = useAuth();
+  const { isClient, token, user } = useAuth();
+
+  const isTeamConsole = preset === "team";
+  const isMyTickets = preset === "my";
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -76,6 +83,7 @@ export const TicketsPage: React.FC = () => {
     isError,
   } = useSearchTicketsQuery({
     projectId: selectedProjectId || undefined,
+    requesterId: isMyTickets ? (user?.id || user?._id) : undefined,
     search: search || undefined,
     status: status || undefined,
     severity: severity || undefined,
@@ -142,13 +150,19 @@ export const TicketsPage: React.FC = () => {
             </div>
 
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Support Tickets
+              {isTeamConsole
+                ? "Team Support Console"
+                : isMyTickets
+                ? "My Support Tickets"
+                : "Support Tickets Console"}
             </h1>
           </div>
 
           <p className="text-xs text-slate-500 mt-1">
-            {isClient
-              ? "Track your reported issues and request updates."
+            {isTeamConsole
+              ? "Cross-project ticket queue, triage, and SLA management for support team."
+              : isMyTickets
+              ? "Track and manage support requests submitted by you."
               : "Manage and resolve tickets across your project workspaces."}
           </p>
         </div>

@@ -1,82 +1,90 @@
-import User, { IUser, UserType } from "../models/user.js";
-import ProjectMembership, { ProjectRole } from "../models/ProjectMembership.js";
 import { BadRequestError, NotFoundError } from "../utils/app-error.js";
+import User, { IUser, UserType } from "../models/user.js";
+import Ticket from "../models/Ticket.js";
+import AuditLog from "../models/AuditLog.js";
+import ProjectMembership, { ProjectRole } from "../models/ProjectMembership.js";
 
-export interface AdminUserListItem {
-  _id: string;
+export interface EnrichedAdminUser {
+  id: string;
   name: string;
   email: string;
   userType: UserType;
   isPlatformAdmin: boolean;
   isActive: boolean;
+  tokenVersion: number;
   clientMembershipsCount: number;
   totalMembershipsCount: number;
   createdAt: Date;
 }
 
 export class AdminService {
-  /**
-   * Fetch all users with enriched project membership counts
-   */
-  async getAllUsers(): Promise<AdminUserListItem[]> {
-    const users = await User.find().sort({ createdAt: -1 });
+  async getAllUsers(): Promise<EnrichedAdminUser[]> {
+    const users = await User.find({}).sort({ createdAt: -1 });
 
-    const enriched = await Promise.all(
+    const clientRoles: ProjectRole[] = ["client_org_admin", "client_requester"];
+
+    const enrichedUsers = await Promise.all(
       users.map(async (u) => {
-        const memberships = await ProjectMembership.find({ userId: u._id });
-        const clientMembershipsCount = memberships.filter((m) =>
-          ["client_org_admin", "client_requester"].includes(m.role)
-        ).length;
+        const totalMembershipsCount = await ProjectMembership.countDocuments({
+          userId: u._id,
+        });
+
+        const clientMembershipsCount = await ProjectMembership.countDocuments({
+          userId: u._id,
+          role: { $in: clientRoles },
+        });
 
         return {
-          _id: u._id.toString(),
+          id: u._id.toString(),
           name: u.name,
           email: u.email,
           userType: u.userType,
           isPlatformAdmin: u.isPlatformAdmin,
           isActive: u.isActive,
+          tokenVersion: u.tokenVersion || 0,
           clientMembershipsCount,
-          totalMembershipsCount: memberships.length,
+          totalMembershipsCount,
           createdAt: u.createdAt,
         };
       })
     );
 
-    return enriched;
+    return enrichedUsers;
   }
 
-  /**
-   * Toggle user active/inactive status with immediate session invalidation
-   */
   async updateUserStatus(
     targetUserId: string,
     isActive: boolean,
     actor: IUser
   ): Promise<IUser> {
+    if (targetUserId === actor._id.toString()) {
+      throw new BadRequestError("You cannot deactivate your own admin account");
+    }
+
     const user = await User.findById(targetUserId);
 
     if (!user) {
       throw new NotFoundError("User not found");
     }
 
-    if (user._id.toString() === actor._id.toString()) {
-      throw new BadRequestError("Platform Admins cannot deactivate their own account");
-    }
-
     user.isActive = isActive;
 
-    // Increment tokenVersion on deactivation to invalidate all active refresh tokens
     if (!isActive) {
       user.tokenVersion = (user.tokenVersion || 0) + 1;
     }
 
     await user.save();
+
+    await AuditLog.create({
+      action: "PLATFORM_ADMIN_USER_STATUS_CHANGE",
+      actorId: actor._id,
+      targetId: user._id,
+      details: { newStatus: isActive ? "active" : "deactivated", tokenVersion: user.tokenVersion },
+    });
+
     return user;
   }
 
-  /**
-   * Update userType (internal <-> client) with client membership guard
-   */
   async updateUserType(
     targetUserId: string,
     targetType: UserType,
@@ -96,7 +104,6 @@ export class AdminService {
       return user;
     }
 
-    // Conversion Guard: Block client -> internal if user holds active client project memberships
     if (user.userType === "client" && targetType === "internal") {
       const clientRoles: ProjectRole[] = ["client_org_admin", "client_requester"];
       const clientMemberships = await ProjectMembership.find({
@@ -113,7 +120,34 @@ export class AdminService {
 
     user.userType = targetType;
     await user.save();
+
+    await AuditLog.create({
+      action: "PLATFORM_ADMIN_USER_TYPE_CHANGE",
+      actorId: actor._id,
+      targetId: user._id,
+      details: { newUserType: targetType },
+    });
+
     return user;
+  }
+
+  async deleteClientOrgData(clientOrgName: string, actor: IUser): Promise<{ deletedTicketsCount: number }> {
+    if (!clientOrgName || !clientOrgName.trim()) {
+      throw new BadRequestError("Client organisation name is required");
+    }
+
+    const tickets = await Ticket.find({ clientOrganisation: clientOrgName.trim() });
+    const count = tickets.length;
+
+    await Ticket.deleteMany({ clientOrganisation: clientOrgName.trim() });
+
+    await AuditLog.create({
+      action: "CLIENT_ORG_DATA_PURGE",
+      actorId: actor._id,
+      details: { clientOrganisation: clientOrgName.trim(), deletedTicketsCount: count },
+    });
+
+    return { deletedTicketsCount: count };
   }
 }
 

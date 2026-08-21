@@ -5,7 +5,9 @@ import {
     getMe,
     refresh,
     logout,
-    getUsers
+    getUsers,
+    sendVerification,
+    verifyEmail
 } from "../controllers/auth.controller.js";
 
 import authMiddleware from "../middleware/auth.middleware.js";
@@ -18,6 +20,8 @@ router.get("/me", authMiddleware, getMe);
 router.get("/users", authMiddleware, getUsers);
 router.post("/refresh", refresh);
 router.post("/logout", logout);
+router.post("/send-verification", authMiddleware, sendVerification);
+router.post("/verify-email", authMiddleware, verifyEmail);
 
 export default router;
 

@@ -16,6 +16,8 @@ import {
   getPresignedUploadUrl,
   getEvidenceViewUrl,
   streamEvidenceFile,
+  getTeamConsoleTickets,
+  bulkUpdateTickets,
 } from "../controllers/ticket.controller.js";
 
 import authMiddleware from "../middleware/auth.middleware.js";

@@ -8,10 +8,13 @@ export type ProjectRole =
   | "client_requester"
   | "client_org_admin";
 
+export type MembershipStatus = "pending" | "active" | "rejected" | "deactivated";
+
 export interface IProjectMembership extends Document {
   userId: Types.ObjectId;
   projectId: Types.ObjectId;
   role: ProjectRole;
+  status: MembershipStatus;
   clientOrganisation?: string;
   receivesNewTicketAlerts: boolean;
   createdAt: Date;
@@ -50,6 +53,13 @@ const projectMembershipSchema = new Schema<IProjectMembership>(
         "client_org_admin",
       ],
       required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "active", "rejected", "deactivated"],
+      default: "active",
+      index: true,
     },
 
     clientOrganisation: {

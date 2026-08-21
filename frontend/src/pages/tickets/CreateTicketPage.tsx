@@ -10,6 +10,7 @@ import { TicketSeverity, TicketEvidenceFile } from '../../features/tickets/types
 import { ApiError } from '../../types/api';
 import { useAuth } from '../../hooks/useAuth';
 import TicketEvidenceUploader from '../../features/tickets/components/TicketEvidenceUploader';
+import { EmailVerificationModal } from '../../features/auth/components/EmailVerificationModal';
 
 const ticketFormSchema = z.object({
   projectId: z.string().min(1, 'Please select a project'),
@@ -71,6 +72,7 @@ export const CreateTicketPage: React.FC = () => {
   const [pageUrl, setPageUrl] = useState<string>('');
   const [evidenceFiles, setEvidenceFiles] = useState<TicketEvidenceFile[]>([]);
 
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof TicketFormInput, string>>>({});
 
@@ -177,20 +179,47 @@ export const CreateTicketPage: React.FC = () => {
         Back to Tickets
       </button>
 
-      {/* Header */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-            <TicketIcon className="w-5 h-5" />
-          </div>
-          <div>
+      {/* Header Banner */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 shadow-md shadow-indigo-500/20 text-white flex items-center justify-center font-bold">
+              <TicketIcon className="w-5 h-5" />
+            </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">Create Support Ticket</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Submit a detailed issue report or feature request for your project team
-            </p>
           </div>
+          <p className="text-xs text-slate-500 mt-1">Submit a detailed issue report to your assigned project support team.</p>
         </div>
       </div>
+
+      {/* BR-ACC-002: Email Verification Warning Banner */}
+      {user && !user.isEmailVerified && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold">Email Verification Required (BR-ACC-002)</p>
+              <p className="text-[11px] text-amber-700">
+                You must verify your email address before raising support tickets.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsVerifyModalOpen(true)}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+          >
+            Verify Email
+          </button>
+        </div>
+      )}
+
+      <EmailVerificationModal
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+      />
 
       {/* Error Alert */}
       {errorMessage && (

@@ -134,6 +134,54 @@ export class AuthController {
       next(error);
     }
   };
+
+  sendVerification = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        next(new UnauthorizedError("Authentication required"));
+        return;
+      }
+
+      const result = await this.service.sendVerificationCode(req.user);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  verifyEmail = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        next(new UnauthorizedError("Authentication required"));
+        return;
+      }
+
+      const { code } = req.body;
+      if (!code) {
+        res.status(400).json({ success: false, message: "Verification code is required" });
+        return;
+      }
+
+      const result = await this.service.verifyEmailCode(req.user, code);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export const authController = new AuthController();
@@ -143,3 +191,5 @@ export const getMe = authController.getMe;
 export const refresh = authController.refresh;
 export const logout = authController.logout;
 export const getUsers = authController.getUsers;
+export const sendVerification = authController.sendVerification;
+export const verifyEmail = authController.verifyEmail;

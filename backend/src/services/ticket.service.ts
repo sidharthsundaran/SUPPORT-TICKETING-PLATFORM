@@ -41,6 +41,7 @@ import {
   calculateResolutionDueAt,
 } from "../utils/sla.calculator.js";
 import { notificationService, NotificationService } from "./notification.service.js";
+import AuditLog from "../models/AuditLog.js";
 
 export interface CreateTicketDTO {
   projectId: string;
@@ -591,6 +592,122 @@ export class TicketService {
       const sequence = String(count + 1).padStart(4, "0");
       return `${code}-${yyyymm}-${sequence}`;
     }
+  }
+
+  async getTeamConsoleTickets(
+    user: any,
+    filters: TicketFilters & { preset?: string },
+    options: PaginationOptions = {}
+  ) {
+    let userProjectIds: string[] = [];
+
+    if (!user.isPlatformAdmin) {
+      const memberships = await this.membershipRepo.findByUser(user._id.toString());
+      const activeMemberships = memberships.filter((m) => m.status === undefined || m.status === "active");
+      userProjectIds = activeMemberships.map((m) =>
+        typeof m.projectId === "object" && (m.projectId as any)._id
+          ? (m.projectId as any)._id.toString()
+          : m.projectId.toString()
+      );
+    } else {
+      const projects = await this.projectRepo.findActive();
+      userProjectIds = projects.map((p: any) => p._id.toString());
+    }
+
+    const searchFilters: TicketFilters = { ...filters };
+
+    if (filters.projectId) {
+      if (!user.isPlatformAdmin && !userProjectIds.includes(filters.projectId)) {
+        return { data: [], total: 0, page: options.page || 1, limit: options.limit || 20, totalPages: 0 };
+      }
+    } else {
+      searchFilters.projectIds = userProjectIds;
+    }
+
+    // Apply Preset Views Filter Logic
+    if (filters.preset === "unassigned") {
+      searchFilters.assigneeId = "unassigned";
+    } else if (filters.preset === "my_open") {
+      searchFilters.assigneeId = user._id.toString();
+    } else if (filters.preset === "critical_high") {
+      searchFilters.severity = "critical";
+    }
+
+    const result = await this.ticketRepo.find(searchFilters, options);
+
+    const { calculateTicketSlaInfo } = await import("../utils/sla.calculator.js");
+
+    const enrichedData = result.data.map((ticket: any) => {
+      const sla = calculateTicketSlaInfo(ticket);
+      return {
+        ...ticket.toObject(),
+        sla,
+      };
+    });
+
+    return {
+      ...result,
+      data: enrichedData,
+    };
+  }
+
+  async bulkUpdateTickets(
+    ticketIds: string[],
+    update: { assigneeId?: string | null; status?: TicketStatus; tags?: string[] },
+    actor: any
+  ): Promise<{ updatedCount: number }> {
+    if (!ticketIds || ticketIds.length === 0) {
+      throw new BadRequestError("At least one ticketId must be specified for bulk update");
+    }
+
+    let updatedCount = 0;
+
+    for (const ticketId of ticketIds) {
+      const ticket = await this.ticketRepo.findById(ticketId);
+      if (!ticket) continue;
+
+      let hasChanges = false;
+
+      if (update.assigneeId !== undefined) {
+        if (update.assigneeId === null) {
+          (ticket as any).assigneeId = undefined;
+        } else {
+          ticket.assigneeId = update.assigneeId as any;
+        }
+        hasChanges = true;
+      }
+
+      if (update.status && update.status !== ticket.status) {
+        ticket.status = update.status;
+        hasChanges = true;
+      }
+
+      if (update.tags && Array.isArray(update.tags)) {
+        ticket.tags = Array.from(new Set([...(ticket.tags || []), ...update.tags]));
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        await ticket.save();
+        updatedCount++;
+
+        await this.activityRepo.create({
+          ticketId: ticket._id.toString(),
+          actorId: actor._id.toString(),
+          action: "details_updated",
+          metadata: update,
+        });
+
+        await AuditLog.create({
+          action: "BULK_TICKET_UPDATE",
+          actorId: actor._id,
+          targetId: ticket._id,
+          details: update,
+        });
+      }
+    }
+
+    return { updatedCount };
   }
 }
 

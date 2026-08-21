@@ -10,6 +10,9 @@ export interface IUser extends Document {
   isPlatformAdmin: boolean;
   isActive: boolean;
   tokenVersion: number;
+  isEmailVerified: boolean;
+  emailVerificationCode?: string;
+  emailVerificationExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +55,16 @@ const userSchema = new Schema(
     tokenVersion: {
       type: Number,
       default: 0,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationCode: {
+      type: String,
+    },
+    emailVerificationExpires: {
+      type: Date,
     },
   },
   {
