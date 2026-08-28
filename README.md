@@ -75,7 +75,7 @@ Ensure you have the following installed on your environment:
 - **npm**: `v9.x` or higher
 - **MongoDB**: Local MongoDB instance running on `mongodb://localhost:27017` or MongoDB Atlas URI
 - **Redis**: Local Redis server running on `localhost:6379` (optional for local fallback, required for queueing)
-
+> **Important:** Platform Administrator accounts must currently be promoted manually by updating the user's `isPlatformAdmin` field in MongoDB. Verification emails may be delivered to the recipient's Spam/Junk folder, particularly during development.
 ---
 
 ### Step 1: Environment Variables Setup
