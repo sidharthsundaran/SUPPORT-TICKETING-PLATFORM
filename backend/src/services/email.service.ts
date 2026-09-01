@@ -59,26 +59,67 @@ export class EmailService {
 
   async sendEmail(options: SendEmailOptions): Promise<boolean> {
     const { to, subject, html, text } = options;
-    const from = process.env.EMAIL_FROM || this.defaultSender;
+    const resendApiKey = process.env.RESEND_API_KEY;
 
-    if (!this.transporter) {
-      console.log(`[Email Service Mock Dispatch] To: ${to} | Subject: ${subject}`);
-      return true;
+    // 1. Send via Resend REST API (HTTPS Port 443 - Never blocked on Render)
+    if (resendApiKey) {
+      const from =
+        process.env.RESEND_FROM ||
+        process.env.EMAIL_FROM ||
+        "Support Platform <onboarding@resend.dev>";
+
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey.trim()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from,
+            to: [to],
+            subject,
+            html,
+            text: text || subject,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData: any = await response.json().catch(() => ({ message: response.statusText }));
+          const errorMessage = errorData?.message || errorData?.name || JSON.stringify(errorData);
+          console.error(`[Resend Error] Failed to send email to ${to}: ${errorMessage}`);
+          throw new Error(`Resend Error: ${errorMessage}`);
+        }
+
+        console.log(`[Resend Success] Email delivered to ${to} | Subject: ${subject}`);
+        return true;
+      } catch (err: any) {
+        console.error(`[Email Service Error] Failed via Resend to ${to}:`, err?.message || err);
+        throw err;
+      }
     }
 
-    try {
-      await this.transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        text: text || subject,
-      });
-      return true;
-    } catch (err: any) {
-      console.error(`[Email Service Error] Failed to send email to ${to}:`, err?.message || err);
-      throw err;
+    // 2. Fallback to Nodemailer SMTP
+    if (this.transporter) {
+      const from = process.env.EMAIL_FROM || this.defaultSender;
+      try {
+        await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          html,
+          text: text || subject,
+        });
+        return true;
+      } catch (err: any) {
+        console.error(`[Email Service Error] Failed to send email to ${to}:`, err?.message || err);
+        throw err;
+      }
     }
+
+    // 3. Fallback to Mock Dispatch
+    console.log(`[Email Service Mock Dispatch] To: ${to} | Subject: ${subject}`);
+    return true;
   }
 
   renderHtmlTemplate(title: string, contentHtml: string, actionUrl?: string, actionText?: string): string {
