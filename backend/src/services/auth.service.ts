@@ -41,6 +41,8 @@ export interface AuthResult {
     email: string;
     userType: UserType;
     isPlatformAdmin: boolean;
+    isActive?: boolean;
+    isEmailVerified?: boolean;
   };
   accessToken: string;
   refreshToken: string;
@@ -94,6 +96,8 @@ export class AuthService {
         email: user.email,
         userType: user.userType,
         isPlatformAdmin: user.isPlatformAdmin,
+        isActive: user.isActive,
+        isEmailVerified: Boolean(user.isEmailVerified),
       },
       accessToken,
       refreshToken,
@@ -137,6 +141,8 @@ export class AuthService {
         email: user.email,
         userType: user.userType,
         isPlatformAdmin: user.isPlatformAdmin,
+        isActive: user.isActive,
+        isEmailVerified: Boolean(user.isEmailVerified),
       },
       accessToken,
       refreshToken,
@@ -250,6 +256,8 @@ export class AuthService {
         email: user.email,
         userType: user.userType,
         isPlatformAdmin: user.isPlatformAdmin,
+        isActive: user.isActive,
+        isEmailVerified: Boolean(user.isEmailVerified),
       },
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,

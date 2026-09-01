@@ -405,7 +405,6 @@ export class TicketController {
     }
   };
 
-  // PATCH /api/tickets/:ticketId/assign
   assignTicket = async (
     req: Request,
     res: Response,
@@ -431,7 +430,6 @@ export class TicketController {
     }
   };
 
-  // GET /api/tickets/:ticketId/activity
   getTicketActivities = async (
     req: Request,
     res: Response,

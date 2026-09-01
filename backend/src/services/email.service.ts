@@ -1,3 +1,4 @@
+import "dotenv/config";
 import nodemailer from "nodemailer";
 
 export interface SendEmailOptions {
@@ -12,21 +13,35 @@ export class EmailService {
   private defaultSender: string = '"Support Platform" <no-reply@supportplatform.dev>';
 
   constructor() {
-    const user = process.env.USER || process.env.EMAIL_USER || process.env.SMTP_USER;
-    const pass = process.env.PASS || process.env.EMAIL_PASS || process.env.SMTP_PASS;
+    // Check EMAIL_USER / SMTP_USER first, or USER only if it looks like an email address (to ignore Linux OS user like 'render'/'root')
+    const user =
+      process.env.EMAIL_USER ||
+      process.env.SMTP_USER ||
+      process.env.MAIL_USER ||
+      (process.env.USER && process.env.USER.includes("@") ? process.env.USER : undefined);
+
+    const pass =
+      process.env.EMAIL_PASS ||
+      process.env.SMTP_PASS ||
+      process.env.MAIL_PASS ||
+      process.env.PASS;
+
     const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT) || 587;
+    const port = Number(process.env.SMTP_PORT) || 465;
 
     if (user && pass) {
       this.defaultSender = user;
-      if (process.env.EMAIL_SERVICE === "gmail" || !host) {
+      if (process.env.EMAIL_SERVICE === "gmail" || !host || host === "smtp.gmail.com") {
         this.transporter = nodemailer.createTransport({
-          service: "gmail",
+          host: "smtp.gmail.com",
+          port: 465,
+          secure: true,
           auth: {
             user,
             pass,
           },
-        });
+          family: 4, // Force IPv4 to prevent ENETUNREACH on IPv4-only cloud hosts like Render
+        } as any);
       } else {
         this.transporter = nodemailer.createTransport({
           host,
@@ -36,7 +51,8 @@ export class EmailService {
             user,
             pass,
           },
-        });
+          family: 4, // Force IPv4 to prevent ENETUNREACH on IPv4-only cloud hosts like Render
+        } as any);
       }
     }
   }

@@ -7,7 +7,6 @@ export class ReportingController {
     private readonly service: ReportingService = reportingService
   ) {}
 
-  // GET /api/reports/dashboard
   getDashboardMetrics = async (
     req: Request,
     res: Response,

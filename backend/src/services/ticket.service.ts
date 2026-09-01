@@ -106,7 +106,6 @@ export class TicketService {
       throw new BadRequestError("Cannot create ticket in an inactive project");
     }
 
-    // 2. Validate requester membership or platform admin status
     if (!membership && !requesterUser?.isPlatformAdmin) {
       throw new BadRequestError("Requester is not a member of this project");
     }
@@ -131,10 +130,8 @@ export class TicketService {
       }
     }
 
-    // 5. Generate BR-TKT-005 Ticket Reference: <PROJECTCODE>-<YYYYMM>-<SEQ>
     const ticketNumber = await this.generateTicketNumber(project.code || "TKT");
 
-    // 6. Compute SLA Due Dates based on project matrix or defaults
     const now = new Date();
     const severity = dto.severity ?? "medium";
     const slaFirstResponseDueAt = calculateFirstResponseDueAt(
@@ -172,7 +169,6 @@ export class TicketService {
 
     const createdTicket = await this.ticketRepo.create(ticketData);
 
-    // Log Activity
     await this.activityRepo.create({
       ticketId: createdTicket._id.toString(),
       actorId: dto.requesterId,
