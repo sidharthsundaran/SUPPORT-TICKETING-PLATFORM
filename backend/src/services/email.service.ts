@@ -13,7 +13,6 @@ export class EmailService {
   private defaultSender: string = '"Support Platform" <no-reply@supportplatform.dev>';
 
   constructor() {
-    // Check EMAIL_USER / SMTP_USER first, or USER only if it looks like an email address (to ignore Linux OS user like 'render'/'root')
     const user =
       process.env.EMAIL_USER ||
       process.env.SMTP_USER ||
@@ -40,7 +39,7 @@ export class EmailService {
             user,
             pass,
           },
-          family: 4, // Force IPv4 to prevent ENETUNREACH on IPv4-only cloud hosts like Render
+          family: 4,
         } as any);
       } else {
         this.transporter = nodemailer.createTransport({
@@ -51,7 +50,7 @@ export class EmailService {
             user,
             pass,
           },
-          family: 4, // Force IPv4 to prevent ENETUNREACH on IPv4-only cloud hosts like Render
+          family: 4,
         } as any);
       }
     }
@@ -59,9 +58,53 @@ export class EmailService {
 
   async sendEmail(options: SendEmailOptions): Promise<boolean> {
     const { to, subject, html, text } = options;
+    const brevoApiKey = process.env.BREVO_API_KEY;
     const resendApiKey = process.env.RESEND_API_KEY;
 
-    // 1. Send via Resend REST API (HTTPS Port 443 - Never blocked on Render)
+    // 1. Send via Brevo REST API (HTTPS Port 443 - Works on Render, sends to ANY recipient without domain DNS)
+    if (brevoApiKey) {
+      const senderEmail =
+        process.env.BREVO_SENDER_EMAIL ||
+        process.env.EMAIL_USER ||
+        "lucidlayers079@gmail.com";
+      const senderName = process.env.BREVO_SENDER_NAME || "Support Platform";
+
+      try {
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": brevoApiKey.trim(),
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            sender: {
+              name: senderName,
+              email: senderEmail,
+            },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+            textContent: text || subject,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData: any = await response.json().catch(() => ({ message: response.statusText }));
+          const errorMessage = errorData?.message || JSON.stringify(errorData);
+          console.error(`[Brevo Error] Failed to send email to ${to}: ${errorMessage}`);
+          throw new Error(`Brevo Error: ${errorMessage}`);
+        }
+
+        console.log(`[Brevo Success] Email delivered to ${to} | Subject: ${subject}`);
+        return true;
+      } catch (err: any) {
+        console.error(`[Email Service Error] Failed via Brevo to ${to}:`, err?.message || err);
+        throw err;
+      }
+    }
+
+    // 2. Send via Resend REST API (HTTPS Port 443)
     if (resendApiKey) {
       const from =
         process.env.RESEND_FROM ||
@@ -99,7 +142,7 @@ export class EmailService {
       }
     }
 
-    // 2. Fallback to Nodemailer SMTP
+    // 3. Fallback to Nodemailer SMTP
     if (this.transporter) {
       const from = process.env.EMAIL_FROM || this.defaultSender;
       try {
@@ -117,7 +160,7 @@ export class EmailService {
       }
     }
 
-    // 3. Fallback to Mock Dispatch
+    // 4. Fallback to Mock Dispatch
     console.log(`[Email Service Mock Dispatch] To: ${to} | Subject: ${subject}`);
     return true;
   }
