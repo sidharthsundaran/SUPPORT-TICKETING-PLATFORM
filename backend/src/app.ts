@@ -26,7 +26,7 @@ app.use(morgan("dev"));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.get("/health",(req,res)=>res.json({message:"API is running"}))
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tickets", ticketRoutes);
